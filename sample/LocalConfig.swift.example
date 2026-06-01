@@ -1,0 +1,18 @@
+// LocalConfig.swift.example
+//
+// Copy this file to `LocalConfig.swift` (in the same directory) and
+// paste your license key. `LocalConfig.swift` is gitignored — your
+// edits stay local.
+//
+// Get a license key from https://api.octetproof.com/signup.
+//
+// The toy reads `LocalConfig.licenseKey` via plain Swift symbol
+// resolution; if you skip this step, the build fails with
+// `cannot find 'LocalConfig' in scope` pointing right back here.
+
+enum LocalConfig {
+    /// Per-developer license key. Issued by the Octet license backend
+    /// to a single email address; bound to a single device on first
+    /// activation.
+    static let licenseKey = "octet_live_PASTE_YOUR_LICENSE_KEY_HERE"
+}
