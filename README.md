@@ -3,6 +3,13 @@
 Binary distribution of the Octet SDK for iOS — Swift Package Manager and
 Carthage manifests plus tagged `xcframework` releases.
 
+> ⚠️ **`0.0.1-alpha` is deprecated.** The v1 license-key schema cutover
+> shipped in **`0.0.2-alpha`** (2026-06-04). Tokens issued by the current
+> production backend will fail to verify on `0.0.1-alpha` with
+> `LicenseError.verificationFailed(.unsupportedSchema)` at `Octet.start`.
+> Upgrade to `0.0.2-alpha` or later. See [CHANGELOG.md](CHANGELOG.md)'s
+> `[0.0.2-alpha]` entry for details.
+
 ## Installation
 
 ### Swift Package Manager
@@ -19,13 +26,13 @@ Or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "0.0.1-alpha")
+    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "0.0.2-alpha")
 ]
 ```
 
 SwiftPM's `from:` selector won't match pre-release tags (`-alpha`,
 `-beta`, etc.) — use `.exact` for the alpha. Once a non-prerelease
-ships, `from: "0.0.1"` becomes valid.
+ships, `from: "0.0.2"` becomes valid.
 
 ### Carthage
 
