@@ -6,7 +6,7 @@
 // `LocalConfig.swift` is gitignored — your edits stay local.
 //
 // **Getting a key**
-// - Production: https://api.octetproof.com/signup
+// - Production: https://sdk.octetproof.com/signup
 // - Local backend (real-device testing per REAL_DEVICE_TESTING.md):
 //   open `http://<your-lan-ip>:8000/signup` and complete the form.
 //   The license token appears in the server's console log (dev) or

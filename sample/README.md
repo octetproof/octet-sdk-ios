@@ -25,7 +25,7 @@ full app.
   The SDK itself supports iOS 16+; your own host app can target 16.
 - Xcode 15+ on macOS.
 - A valid OctetSDK license key — free trial from
-  [api.octetproof.com/signup](https://api.octetproof.com/signup).
+  [sdk.octetproof.com/signup](https://sdk.octetproof.com/signup).
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install
   xcodegen`). The project ships as a `project.yml` spec rather than a
   committed `.xcodeproj` so it can be regenerated cleanly.
