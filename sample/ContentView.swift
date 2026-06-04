@@ -152,7 +152,10 @@ final class ToyViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
         phase = .starting
         startTask = Task { @MainActor in
             do {
-                let config = OctetConfig(licenseKey: LocalConfig.licenseKey)
+                let config = OctetConfig(
+                    licenseKey: LocalConfig.licenseKey,
+                    advanced: AdvancedConfig(
+                        activationServerUrl: LocalConfig.activationServerUrl))
                 let started = try await Octet.start(config: config, startPosition: nil)
                 self.sdk = started
                 self.phase = .ready

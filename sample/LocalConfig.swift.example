@@ -1,18 +1,36 @@
 // LocalConfig.swift.example
 //
 // Copy this file to `LocalConfig.swift` (in the same directory) and
-// paste your license key. `LocalConfig.swift` is gitignored — your
-// edits stay local.
+// paste your v1 license key.
 //
-// Get a license key from https://api.octetproof.com/signup.
+// `LocalConfig.swift` is gitignored — your edits stay local.
+//
+// **Getting a key**
+// - Production: https://api.octetproof.com/signup
+// - Local backend (real-device testing per REAL_DEVICE_TESTING.md):
+//   open `http://<your-lan-ip>:8000/signup` and complete the form.
+//   The license token appears in the server's console log (dev) or
+//   in the email body.
 //
 // The toy reads `LocalConfig.licenseKey` via plain Swift symbol
 // resolution; if you skip this step, the build fails with
 // `cannot find 'LocalConfig' in scope` pointing right back here.
 
 enum LocalConfig {
+
     /// Per-developer license key. Issued by the Octet license backend
     /// to a single email address; bound to a single device on first
-    /// activation.
-    static let licenseKey = "octet_live_PASTE_YOUR_LICENSE_KEY_HERE"
+    /// activation. Must be a v1 token (`octet_live_v4.public.…`) —
+    /// v0-alpha tokens issued before 2026-06 will fail verification.
+    static let licenseKey = "octet_live_PASTE_YOUR_V1_LICENSE_KEY_HERE"
+
+    /// Activation server URL. Defaults to production; override only
+    /// when running the SDK against the local backend on your
+    /// MacBook's LAN IP per `REAL_DEVICE_TESTING.md`. iOS ATS will
+    /// block plain `http://` to non-localhost without a Info.plist
+    /// exception — see the doc for the recipe.
+    ///
+    /// Example for local backend:
+    ///   "http://192.168.1.42:8000"
+    static let activationServerUrl = "https://api.octetproof.com"
 }
