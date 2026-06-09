@@ -5,6 +5,53 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.0.3-alpha] — 2026-06-09
+
+> **Proof upload + heartbeat lease refresh.** Opt-in proof upload to an
+> `octet-proofs` backend, hardware-backed activation-bearer cache, and
+> a periodic heartbeat scheduler. Backwards-compatible with 0.0.2-alpha
+> consumers — the new features are gated on a new `proofUploadUrl`
+> field that defaults to `nil` (upload subsystem entirely disabled).
+
+### Added — proof upload
+
+- `OctetConfig.proofUploadUrl: String?` — opt-in proof-upload endpoint.
+  Default `nil`: upload subsystem disabled entirely (no scheduler, no
+  network calls). When set, the SDK uploads each generated
+  `LocationProof` to your configured `octet-proofs` backend. HTTPS-only,
+  with a LAN-HTTP exception (RFC 1918 + loopback) for local development.
+- Authentication, retry-with-backoff, and queuing across app restarts
+  are handled by the SDK — nothing additional to wire up.
+
+### Added — heartbeat scheduler + activation-bearer cache
+
+- The activation bearer issued at `/v1/activate` is now persisted in
+  Keychain (`ThisDeviceOnly`) so the SDK can refresh license leases and
+  authenticate proof uploads across app restarts without re-activating.
+- A background scheduler performs periodic lease-refresh pings at the
+  cadence the activate response specifies. The device fingerprint stays
+  consistent across restarts.
+
+### Independent verifier
+
+- The independent proof verifier is now its own repository:
+  [`octetproof/octet-verify`](https://github.com/octetproof/octet-verify).
+  It verifies a proof from a file or by fetching from a backend, and
+  prints what was and was not validated. Designed to be auditable end-
+  to-end by anyone integrating against the SDK.
+
+### Documented
+
+- New section in `INTEGRATION.md` on proof-upload data handling — what
+  the SDK transmits when upload is enabled, how long uploaded proofs
+  are retained on the Octet-hosted backend, the option to fetch and
+  persist proofs yourself, and the self-hosted backend configuration.
+
+### Sample app
+
+- Sample updated to demonstrate proof upload against the configured
+  activation backend.
+
 ## [0.0.2-alpha] — 2026-06-04
 
 > **v1 license-key cutover.** Wire-breaking: v0-alpha tokens issued
