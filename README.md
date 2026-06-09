@@ -7,7 +7,7 @@ Carthage manifests plus tagged `xcframework` releases.
 > shipped in **`0.0.2-alpha`** (2026-06-04). Tokens issued by the current
 > production backend will fail to verify on `0.0.1-alpha` with
 > `LicenseError.verificationFailed(.unsupportedSchema)` at `Octet.start`.
-> Upgrade to `0.0.2-alpha` or later. See [CHANGELOG.md](CHANGELOG.md)'s
+> Upgrade to `0.0.3-alpha` or later. See [CHANGELOG.md](CHANGELOG.md)'s
 > `[0.0.2-alpha]` entry for details.
 
 ## Installation
@@ -26,7 +26,7 @@ Or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "0.0.2-alpha")
+    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "0.0.3-alpha")
 ]
 ```
 
