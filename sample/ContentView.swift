@@ -154,6 +154,10 @@ final class ToyViewModel: NSObject, ObservableObject, CLLocationManagerDelegate 
             do {
                 let config = OctetConfig(
                     licenseKey: LocalConfig.licenseKey,
+                    // #122/#123: opt-in proof upload to prod backend.
+                    // Same host as activation since octet-proofs is
+                    // co-hosted with the license server.
+                    proofUploadUrl: LocalConfig.activationServerUrl,
                     advanced: AdvancedConfig(
                         activationServerUrl: LocalConfig.activationServerUrl))
                 let started = try await Octet.start(config: config, startPosition: nil)
