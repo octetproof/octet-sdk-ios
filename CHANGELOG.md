@@ -5,6 +5,57 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.0.4-alpha] — 2026-06-11
+
+> **Security-hardening pass.** Every change is opt-in or fail-safer-
+> by-default; the public API surface is unchanged. Drop-in upgrade
+> from 0.0.3-alpha.
+
+### Added
+
+- **Opt-in TLS public-key pinning** for connections to
+  `api.octetproof.com`. Off by default in this release; enable via
+  the SDK's networking configuration. Pin set covers the current
+  certificate-authority intermediate and a backup pin; rotation
+  procedure is documented internally and pin expiry is tracked.
+- **Magnetometer-based liveness signal** is now incorporated into
+  on-Earth proof confidence (alongside existing motion / GPS
+  signals).
+- `DeviceKeySecurityLevel` value exposed on the hardware-attestation
+  surface, reporting the actual storage tier
+  (`hardwareSecureEnclave` / `software`) for the device key used in
+  the current run.
+
+### Changed — defaults
+
+- **Unified-log privacy hardened.** Internal log call sites now treat
+  free-form interpolations as `.private` by default; tags remain
+  `.public`. Release builds no longer surface message bodies through
+  `Console.app` / `log show` without explicit privacy opt-in.
+- **Keychain items** for the device key, activation bearer, and
+  device-id are written with `SecAccessControl` requiring
+  `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` (or stricter on
+  hardware-backed devices). Items are no longer included in iCloud
+  Keychain backups or device-to-device transfer.
+- **On-device proof verifier fails closed.** The on-device verifier
+  now returns an explicit `VerificationStatus` of
+  `verified` / `shapeValidUnverified` / `invalid`, with `isValid` set
+  only when the signature has been cryptographically verified against
+  a trusted key. The authoritative end-to-end verifier remains the
+  standalone `octet-verify` CLI.
+- **Proof-upload URL validation** tightened. The LAN-HTTP exception
+  (RFC 1918 + loopback, when proof-upload is opt-in pointed at a
+  development backend) now uses strict numeric-literal parsing rather
+  than DNS-resolving string-prefix matches.
+
+### Sample app
+
+- Sample renamed from `OctetV1Toy` to `OctetSample`; SwiftPM target,
+  scheme, and bundle ID (`com.octetproof.sample`) updated. The xcodeproj
+  is generated from `project.yml` via XcodeGen.
+- Sample `Info.plist` usage strings rewritten to neutral, end-user-
+  appropriate copy.
+
 ## [0.0.3-alpha] — 2026-06-09
 
 > **Proof upload + heartbeat lease refresh.** Opt-in proof upload to an
@@ -60,31 +111,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed — license model (wire-breaking)
 
-- New v1 PASETO v4.public claim schema: `iss, iat, nbf, exp, lid, sub,
+- New v1 PASETO v4.public claim schema (`iss, iat, nbf, exp, lid, sub,
   jti, typ, v, prod, pver, plat, tier, model, limits, feat, ehash,
-  meta`. Tolerant-reader per spec R1; fail-closed defaults per R2; 60s
+  meta`). Tolerant-reader on unknown claims; fail-closed defaults; 60s
   skew tolerance on `nbf` / `exp`.
 - New `LicenseError.verificationFailed(reason:)` carrying a
-  `VerificationReason` enum (`badVendorPrefix, unknownKid,
-  badSignature, notYetValid, wrongIssuer, wrongTyp, unsupportedSchema,
-  productNotLicensed, platformNotLicensed, clockRollback`). The other
+  `VerificationReason` value that names the specific failure mode
+  (vendor prefix, signature, validity window, schema mismatch,
+  product/platform mismatch, clock rollback). The other
   `LicenseError` cases (`malformedKey`, `expired`,
   `activationWindowClosed`, `revoked`, `network`, `noActivation`,
   `serverRejected`) are unchanged.
 - Activation flow: `/v1/activate` now returns a plain JSON lease (TLS
   is the integrity layer); no more signed PASETO activation tokens.
-  `ActivationClient` exposes `activate` / `heartbeat` / `deactivate`
-  per the v1 spec. 14-day offline grace after a successful activation.
-- New device fingerprint per spec §13:
+  `ActivationClient` exposes `activate` / `heartbeat` / `deactivate`.
+  14-day offline grace after a successful activation.
+- Stable device-fingerprint formula:
   `b64url(sha256(install_uuid || platform_hint))` where
   `platform_hint` is `UIDevice.current.identifierForVendor`.
-- Clock anti-rollback per spec §11: `AnchoredClock` persists server-
+- Anti-rollback clock: `AnchoredClock` persists server-
   timestamp anchors in Keychain (`ThisDeviceOnly`), raises
   `.clockRollback` when the wall clock regresses past tolerance.
-- New v1 production signing kid `octet-2026-05-f99d` embedded in the
-  registry. Pre-rotation kid `octet-2026-05-62f1` retained for token
-  continuity (still resolves a public key, but its tokens fail the v1
-  schema gate).
 
 ### Removed
 
@@ -96,8 +143,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Sample app
 
 - `LocalConfig.swift.example` gains an `activationServerUrl` field
-  (defaults to `https://api.octetproof.com`; override for LAN-backend
-  testing per the source repo's `REAL_DEVICE_TESTING.md`).
+  (defaults to `https://api.octetproof.com`; override to a LAN
+  address when running against a self-hosted activation backend).
 
 ### Deprecated
 
