@@ -5,6 +5,52 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.0] — 2026-06-11
+
+> **First stable release.** The public API, proof wire format, and license-
+> claim schema are committed to under semantic versioning from this release
+> forward — backwards-compatible changes ship as 1.x.x. Drop-in upgrade
+> from 0.0.4-alpha for consumers using the documented public API.
+
+### Stable surfaces
+
+- **Public API** — `Octet.start(...)`, the `sdk.loc.isWithin(...)` predicate
+  surface, `OctetVerdict`, `LicenseStatus`, `OctetRegion` shapes, the
+  `LocationProof` envelope, and supporting value types in the `OctetSDK`
+  module.
+- **Wire format** — `LocationProof` envelope (slim public proto with
+  opaque `proof_bytes` plus curated public fields), license PASETO v4.public
+  claim schema, activation lease shape.
+- **Distribution channels** — SwiftPM + Carthage.
+
+### Changed — public API surface narrowed
+
+The 1.0 build narrows the visible surface to the documented public API.
+Consumers using the public `Octet` API are unaffected. Consumers who had
+imported other symbols will see "no such type" on rebuild — those symbols
+are not part of the supported surface.
+
+Surfaces that are public from 1.0:
+- `DeviceKeySecurityLevel` (`HARDWARE_STRONGBOX` / `HARDWARE_TEE` /
+  `SOFTWARE`) — surfaced via the attestation chain so relying parties can
+  read the device-key tier per proof.
+- `LogSink` + `LogLevel` + the platform default sink (`OSLogSink`) —
+  implement `LogSink` to route SDK logs into your own pipeline.
+
+### Fixed
+
+- Clean SwiftPM consumers of the published xcframework no longer hit
+  `Unable to resolve module dependency: SwiftProtobuf` at build time; the
+  binary distribution is now self-contained.
+
+### Carry-over from 0.0.4-alpha
+
+If you're upgrading from 0.0.3-alpha or earlier, the 0.0.4-alpha entry
+below details the security-hardening pass: opt-in TLS public-key pinning,
+hardware-backed key storage, fail-closed proof verifier, default-private
+logging, hardened URL validation, and a magnetometer-based liveness signal
+added to on-Earth proof confidence. All carry forward unchanged.
+
 ## [0.0.4-alpha] — 2026-06-11
 
 > **Security-hardening pass.** Every change is opt-in or fail-safer-

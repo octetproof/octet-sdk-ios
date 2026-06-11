@@ -1,60 +1,69 @@
 # OctetSDK for iOS
 
-Binary distribution of the Octet SDK for iOS — Swift Package Manager and
-Carthage manifests plus tagged `xcframework` releases.
+> **Cryptographically verifiable location proofs.** Every proof the SDK
+> generates is a signed envelope a relying party can verify independently
+> with the standalone [`octet-verify`](https://github.com/octetproof/octet-verify)
+> CLI — no need to trust the SDK at runtime. Hardware-backed device keys
+> where available (Secure Enclave on iOS, StrongBox on Android), with the
+> actual key-storage tier reported in every proof so verifiers can decide
+> what to accept.
 
-> ⚠️ **`0.0.1-alpha` is deprecated.** The v1 license-key schema cutover
-> shipped in **`0.0.2-alpha`** (2026-06-04). Tokens issued by the current
-> production backend will fail to verify on `0.0.1-alpha` with
-> `LicenseError.verificationFailed(.unsupportedSchema)` at `Octet.start`.
-> Upgrade to `0.0.4-alpha` or later. See [CHANGELOG.md](CHANGELOG.md)'s
-> `[0.0.2-alpha]` entry for details.
+## Quick start
+
+```swift
+// 1. In Package.swift
+.package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.0.0")
+
+// 2. In your app code (inside an async context)
+import OctetSDK
+
+let sdk = try await Octet.start(config: OctetConfig(
+    licenseKey: "octet_live_v4.public..."  // from sdk.octetproof.com/signup
+))
+
+let verdict = await sdk.loc.isWithin(region: .country(isoCode: "US"))
+// verdict.result, verdict.reason, verdict.proof (LocationProof)
+```
+
+## How it works
+
+The SDK runs a sensor-fusion + anti-spoofing pipeline on-device and emits
+a `LocationProof` envelope as the cryptographic output of the
+`sdk.loc.isWithin(...)` predicate. The envelope is signed by a
+hardware-backed device key (Secure Enclave / StrongBox / software-backed,
+honestly reported per-proof via `DeviceKeySecurityLevel`).
+
+A relying party verifies the proof with the standalone
+[`octet-verify`](https://github.com/octetproof/octet-verify) CLI or by
+calling the Octet-hosted backend's verify endpoint. This lets a consumer
+separate proof generation from proof acceptance — the SDK signs, an
+independent verifier accepts.
 
 ## Installation
 
 ### Swift Package Manager
 
-In Xcode: **File → Add Packages…** and enter:
-
-```
-https://github.com/octetproof/octet-sdk-ios
-```
-
-Pin to a specific version (recommended) rather than tracking `main`.
-
-Or in `Package.swift`:
+In Xcode: **File → Add Packages…** with the repository URL, or in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "0.0.4-alpha")
+    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.0.0")
 ]
 ```
 
-SwiftPM's `from:` selector won't match pre-release tags (`-alpha`,
-`-beta`, etc.) — use `.exact` for the alpha. Once a non-prerelease
-ships, `from: "0.0.2"` becomes valid.
-
 ### Carthage
 
-In your `Cartfile`:
-
 ```
-binary "https://raw.githubusercontent.com/octetproof/octet-sdk-ios/main/OctetSDK.json" ~> 0.0
+binary "https://raw.githubusercontent.com/octetproof/octet-sdk-ios/main/OctetSDK.json" ~> 1.0
 ```
 
-Then in your Swift code:
-
-```swift
-import OctetSDK
-```
-
-Both SwiftPM and Carthage consumers import the same `OctetSDK` module.
+Both consumers `import OctetSDK`.
 
 ## Getting a license key
 
 OctetSDK requires a valid license key to start. Sign up at
-[sdk.octetproof.com/signup](https://sdk.octetproof.com/signup) to obtain
-one — a free trial key works for evaluation.
+[sdk.octetproof.com/signup](https://sdk.octetproof.com/signup) — a free
+trial key works for evaluation.
 
 ## Requirements
 
@@ -64,10 +73,11 @@ one — a free trial key works for evaluation.
 
 ## Host-app integration prerequisites
 
-Before calling `Octet.start(...)`, add the following keys to your app's
-`Info.plist`. The SDK won't run without them. See
-[INTEGRATION.md](INTEGRATION.md) for the full list, the conditional
-keys for background-location use, and sample copy.
+Before calling `Octet.start(...)`, add the location + motion usage keys
+to your app's `Info.plist`. See [INTEGRATION.md](INTEGRATION.md) for the
+full integration guide — `Info.plist` keys, opt-in TLS certificate
+pinning, log routing, and reading the per-proof
+`DeviceKeySecurityLevel`.
 
 ```xml
 <key>NSLocationWhenInUseUsageDescription</key>
@@ -81,8 +91,9 @@ moving, which improves the confidence of location proofs.</string>
 
 ## Releases
 
-Each tagged release on this repository carries the `OctetSDK.xcframework.zip`
-as an asset. See [Releases](https://github.com/octetproof/octet-sdk-ios/releases).
+Each tagged release on this repository carries
+`OctetSDK.xcframework.zip` as an asset. See
+[Releases](https://github.com/octetproof/octet-sdk-ios/releases).
 
 ## Sample app
 
