@@ -1,4 +1,4 @@
-# OctetV1Toy — iOS dev sample
+# OctetSample — iOS dev sample
 
 Minimal demo app exercising only the public v1 SDK surface
 (`Octet.start(...)` + `sdk.loc.isWithin(...)`). One button, one
@@ -7,7 +7,7 @@ side.
 
 This is the **dev-time copy**. It consumes the SDK source via a local
 SwiftPM path dependency (`path: ../../ios`) so SDK changes propagate
-to the toy immediately — no release roundtrip required. Use it to
+to the sample immediately — no release roundtrip required. Use it to
 smoke-test new SDK features as you write them.
 
 A **consumer-facing copy** lives at `octet-sdk-ios/sample/` in the
@@ -19,7 +19,7 @@ tagged release (see `.github/workflows/release-ios.yml`).
 
 The SDK won't start without a v1 license key. Get one at
 [api.octetproof.com/signup](https://api.octetproof.com/signup), or
-issue one from a local backend per `REAL_DEVICE_TESTING.md`. Then:
+issue one from your own self-hosted activation backend. Then:
 
 ```bash
 # In samples-public/ios-sample/ :
@@ -39,15 +39,15 @@ xcodegen`), then from `samples-public/ios-sample/`:
 
 ```bash
 xcodegen generate
-open OctetV1Toy.xcodeproj
+open OctetSample.xcodeproj
 # or from the CLI:
-xcodebuild -project OctetV1Toy.xcodeproj \
-           -scheme OctetV1Toy \
+xcodebuild -project OctetSample.xcodeproj \
+           -scheme OctetSample \
            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
            build
 ```
 
-Bundle ID: `com.octetproof.toy.v1`.
+Bundle ID: `com.octetproof.sample`.
 
 When running on a real device, set the **Apple Team ID** in the
 target's *Signing & Capabilities* panel. Required `Info.plist`

@@ -7,10 +7,10 @@
 //
 // **Getting a key**
 // - Production: https://sdk.octetproof.com/signup
-// - Local backend (real-device testing per REAL_DEVICE_TESTING.md):
-//   open `http://<your-lan-ip>:8000/signup` and complete the form.
-//   The license token appears in the server's console log (dev) or
-//   in the email body.
+// - Local backend (real-device testing against your own activation
+//   server): open `http://<your-lan-ip>:8000/signup` and complete the
+//   form. The license token appears in the server's console log
+//   (dev) or in the email body.
 //
 // The toy reads `LocalConfig.licenseKey` via plain Swift symbol
 // resolution; if you skip this step, the build fails with
@@ -25,10 +25,10 @@ enum LocalConfig {
     static let licenseKey = "octet_live_PASTE_YOUR_V1_LICENSE_KEY_HERE"
 
     /// Activation server URL. Defaults to production; override only
-    /// when running the SDK against the local backend on your
-    /// MacBook's LAN IP per `REAL_DEVICE_TESTING.md`. iOS ATS will
-    /// block plain `http://` to non-localhost without a Info.plist
-    /// exception — see the doc for the recipe.
+    /// when running the SDK against your own activation backend on
+    /// your development machine's LAN IP. iOS ATS will block plain
+    /// `http://` to non-localhost without an `NSExceptionDomains`
+    /// entry in `Info.plist` for that host.
     ///
     /// Example for local backend:
     ///   "http://192.168.1.42:8000"

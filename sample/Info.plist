@@ -19,9 +19,9 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Octet v1 toy needs your location to demo the predicate API.</string>
+	<string>This sample uses your location to demonstrate the Octet predicate API.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>Octet v1 toy uses motion data to detect when you're stationary or moving, which improves location-proof confidence.</string>
+	<string>This sample uses motion data to demonstrate how movement improves location-proof confidence.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>
