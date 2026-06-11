@@ -1,4 +1,5 @@
 {
+    "1.0.0": "https://github.com/octetproof/octet-sdk-ios/releases/download/1.0.0/OctetSDK.xcframework.zip",
     "0.0.4-alpha": "https://github.com/octetproof/octet-sdk-ios/releases/download/0.0.4-alpha/OctetSDK.xcframework.zip",
     "0.0.3-alpha": "https://github.com/octetproof/octet-sdk-ios/releases/download/0.0.3-alpha/OctetSDK.xcframework.zip",
     "0.0.2-alpha": "https://github.com/octetproof/octet-sdk-ios/releases/download/0.0.2-alpha/OctetSDK.xcframework.zip",
