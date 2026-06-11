@@ -1,4 +1,4 @@
-name: OctetV1Toy
+name: OctetSample
 options:
   bundleIdPrefix: com.octetproof
   # OctetSDK itself supports iOS 16+. The demo bumps to iOS 17 to use
@@ -17,7 +17,7 @@ packages:
     path: ..
 
 targets:
-  OctetV1Toy:
+  OctetSample:
     type: application
     platform: iOS
     sources:
@@ -28,11 +28,15 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        NSLocationWhenInUseUsageDescription: "OctetV1Toy needs your location to demo the OctetSDK predicate API."
-        NSMotionUsageDescription: "OctetV1Toy uses motion data to detect when you're stationary or moving, which improves the confidence of location proofs."
+        # These usage strings must stay in lockstep with Info.plist
+        # (xcodegen overwrites Info.plist from here if
+        # GENERATE_INFOPLIST_FILE is ever flipped to YES). Keep both
+        # in neutral, end-user-appropriate copy.
+        NSLocationWhenInUseUsageDescription: "This sample uses your location to demonstrate the Octet predicate API."
+        NSMotionUsageDescription: "This sample uses motion data to demonstrate how movement improves location-proof confidence."
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.octetproof.toy.v1
+        PRODUCT_BUNDLE_IDENTIFIER: com.octetproof.sample
         SWIFT_VERSION: "5.9"
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
@@ -42,9 +46,9 @@ targets:
         product: OctetSDK
 
 schemes:
-  OctetV1Toy:
+  OctetSample:
     build:
       targets:
-        OctetV1Toy: all
+        OctetSample: all
     run:
       config: Debug
