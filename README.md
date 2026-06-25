@@ -12,7 +12,7 @@
 
 ```swift
 // 1. In Package.swift
-.package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.0.0")
+.package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.1.0")
 
 // 2. In your app code (inside an async context)
 import OctetSDK
@@ -47,7 +47,7 @@ In Xcode: **File → Add Packages…** with the repository URL, or in `Package.s
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.0.0")
+    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.1.0")
 ]
 ```
 
@@ -75,9 +75,9 @@ trial key works for evaluation.
 
 Before calling `Octet.start(...)`, add the location + motion usage keys
 to your app's `Info.plist`. See [INTEGRATION.md](INTEGRATION.md) for the
-full integration guide — `Info.plist` keys, opt-in TLS certificate
-pinning, log routing, and reading the per-proof
-`DeviceKeySecurityLevel`.
+full integration guide — `Info.plist` keys, device attestation (App Attest),
+optional usage telemetry, opt-in TLS certificate pinning, log routing,
+verdict reason codes, and reading the per-proof `DeviceKeySecurityLevel`.
 
 ```xml
 <key>NSLocationWhenInUseUsageDescription</key>
