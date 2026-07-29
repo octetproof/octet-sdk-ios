@@ -146,6 +146,68 @@ proof generation. How often a fresh attestation is produced is configurable via
 `OctetConfig.advanced.attestationCadence` — `perSession`, `periodic(interval:)`
 (default), or `perProof` (highest assurance, highest cost).
 
+### Bootstrapping your verifier — `attestationEnrolmentBundle()`
+
+If you run your own verifier, it needs this device key's hardware root to trust
+the key's signatures. Normally that root arrives on the first proof a device
+submits — but a freshly-deployed, scaled-out, or migrated verifier may not have
+seen that proof yet. `Octet.attestationEnrolmentBundle()` closes that gap:
+
+```swift
+if let bundle = Octet.attestationEnrolmentBundle() {
+    let json = bundle.jsonString()      // canonical v:1 envelope
+    // POST json to your verifier's enrolment endpoint
+}
+```
+
+It returns `nil` until the device key has been attested (i.e. after the first
+proof of the install). The call is cheap and local (a Keychain read, no network),
+and the bundle is attestation evidence — not a secret — so it is safe to send and
+to call repeatedly.
+
+### Handling an unsupported-version error
+
+`Octet.start(...)` can throw `LicenseError.upgradeRequired(minVersion:message:)`
+when the backend stops supporting the running SDK version. It carries an optional
+`minVersion` and human-readable `message`. Handle it by prompting the user to
+update the app; a live session already running is unaffected. `LicenseStatus` also
+exposes non-fatal hints — `upgradeRecommended` and `minSupportedVersion` — that let
+you nudge an upgrade before the hard cutoff. (Version gating is dormant until
+enabled server-side, so you will not see these in 1.2.0 yet — wiring the handler
+now keeps you ready.)
+
+---
+
+## Privacy manifest
+
+The xcframework bundles a `PrivacyInfo.xcprivacy` declaring the SDK's collected data
+types (precise/coarse location, device identifier, aggregate usage counters) and its
+required-reason API usage (System Boot Time for the anchored license clock; UserDefaults
+for a one-time device-id migration). Xcode aggregates it automatically into your app's
+privacy report at build time — no action needed. Review it alongside your app's own
+disclosures when you complete App Store privacy details.
+
+---
+
+## Session-binding (per-login proofs)
+
+To turn a location proof into an authentication factor — "in this region, *for this
+login, right now*" — pass the one-time nonce your login backend issued as
+`sessionNonce`:
+
+```swift
+let verdict = await sdk.loc.isWithin(.country("US"), sessionNonce: loginNonce)
+// forward verdict.proof to your login backend, which verifies the binding
+```
+
+The SDK commits `SHA256("octet-session-binding-v1" ‖ len ‖ nonce)` into the signed
+proof and forces a fresh (uncached) proof — **the raw nonce never leaves the
+device**. Your verifier (octet-verify ≥ 1.2.0), given the same expected nonce,
+confirms the proof was made for that specific login; an older verifier simply
+ignores the binding (NOT-CHECKED). `sessionNonce` must be **1…512 bytes** — empty or
+larger returns an `invalidSessionNonce` verdict with no proof and no network call.
+Omit it entirely for normal, cacheable proofs (behaviour is unchanged from 1.1.0).
+
 ---
 
 ## Interpreting a verdict — reason codes & achievable level
@@ -187,6 +249,50 @@ reference copy. You're free to use them verbatim, translate, or
 rewrite for your brand. Apple's review reads these strings; reviewers
 prefer specific, user-friendly explanations over generic "to function"
 boilerplate.
+
+---
+
+## Verifying your OctetSDK download
+
+Every release publishes a SHA-256 manifest and a build-provenance
+attestation so you can confirm the framework you pulled is the genuine,
+unmodified Octet artifact built by our release pipeline.
+
+**Swift Package Manager verifies the framework automatically.** The
+`checksum:` in `Package.swift` is checked against the downloaded
+`OctetSDK.xcframework.zip` on resolution — a mismatch fails the build, so
+no extra step is needed.
+
+**Carthage, CocoaPods, or a manual download — verify by hand.** Download
+`OctetSDK.xcframework.zip`, `SHASUMS256.txt`, and
+`OctetSDK.xcframework.zip.sigstore.json` from the release into one
+directory, then:
+
+```sh
+# 1. Confirm the bytes match the published SHA-256.
+shasum -a 256 -c SHASUMS256.txt
+
+# 2. Confirm the checksums were signed by the official release workflow
+#    (keyless Sigstore signature over the manifest).
+cosign verify-blob \
+  --certificate SHASUMS256.txt.pem \
+  --signature SHASUMS256.txt.sig \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/octetproof/octet-sdk/\.github/workflows/release-ios\.yml@' \
+  SHASUMS256.txt
+
+# 3. Confirm the archive was built by the official release workflow.
+gh attestation verify OctetSDK.xcframework.zip \
+  --bundle OctetSDK.xcframework.zip.sigstore.json \
+  --repo octetproof/octet-sdk
+```
+
+Steps 1–2 (checksum + keyless cosign signature) are the required verification and
+must both report success. Step 3 (`gh attestation verify`) applies only when a
+`.sigstore.json` build-provenance bundle is attached to the release — 1.2.0 ships
+**without** one (a private-source-repo limitation, tracked in `octetproof/octet-sdk#169`),
+so skip step 3 if no bundle is present. Steps 2–3 use the attached files offline —
+the GitHub CLI and cosign are needed, but no special repository access.
 
 ---
 

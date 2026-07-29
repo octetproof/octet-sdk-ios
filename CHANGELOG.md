@@ -5,6 +5,68 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] — 2026-07-29
+
+> Feature release on top of 1.1.0. Backwards-compatible, drop-in upgrade: the
+> public API additions are additive and the proof wire format is a strict superset
+> of 1.1.0 — a proof made without a session nonce is byte-identical, and the new
+> optional session-binding stage is ignored (NOT-CHECKED) by a 1.1.0 verifier.
+> **Enforcing** session-binding needs octet-verify ≥ 1.2.0. Two other additions
+> ship **inert** (SDK-version upgrade gating; the `creditServiceUrl` hook) —
+> present but with no runtime effect until their backends turn them on — so
+> upgrading changes nothing for existing integrations.
+
+### Added
+
+- **Verifier hardware-root bootstrap — `Octet.attestationEnrolmentBundle()`.**
+  Returns this device key's `AttestationEnrolmentBundle` (`jsonString()` /
+  `protoData()`), carrying the App Attest object, its nonce, and a matching
+  assertion. Hand it to a verifier's enrolment step so the verifier can establish
+  this device's hardware root **without** waiting for the once-per-key attestation
+  object to arrive on a submitted proof — useful for a freshly-deployed, scaled,
+  or migrated verifier. Cheap and local (a Keychain read, no network); returns
+  `nil` until the device key has been attested (first proof of the install).
+- **SDK version reporting + upgrade gating.** The SDK now reports its version and
+  platform on every backend request. Two new surfaces:
+  `LicenseError.upgradeRequired(minVersion:message:)`, thrown from `Octet.start`
+  when the backend rejects an out-of-support version; and non-fatal soft-warning
+  hints on `LicenseStatus` — `upgradeRecommended: Bool` and
+  `minSupportedVersion: String?`. **Inert in 1.2.0** — the backend gates no version
+  yet, so you will not see these until version policy is enabled.
+- **`OctetConfig.creditServiceUrl` (reserved).** Opt-in endpoint for a forthcoming
+  credit-consumption subsystem. Default `nil` disables it; **metering is not active
+  in this release.**
+- **Privacy manifest.** The xcframework now bundles a `PrivacyInfo.xcprivacy`
+  declaring collected data types (location, device identifier, aggregate usage
+  counters) and required-reason API usage. Xcode aggregates it into your app's
+  privacy report automatically. See INTEGRATION.md → "Privacy manifest."
+- **`OctetConfig.debugMode`.** New opt-in config field (default `false`). When
+  `true`, the SDK unlocks its verbose diagnostics-capture tier in a **release**
+  build for a support deep-dive — previously only available in a debug build of
+  the SDK. Client-side only; PII discipline unchanged. (#163)
+- **Session-binding for logins.** `isWithin` / `isOutside` / `contains` gain an
+  optional `sessionNonce: Data?`. Pass the one-time nonce your login backend issued
+  and it's committed inside the signed proof, so your verifier can confirm the proof
+  was made *for that specific login*; forward the returned `verdict.proof` to your
+  backend. Only a hash of the nonce is serialized (never the raw bytes); omitting it
+  preserves 1.1.0 behaviour exactly. Enforcement needs octet-verify ≥ 1.2.0. (#128)
+
+### Changed
+
+- **Stronger GNSS anti-spoofing.** The raw-GNSS witness that cross-checks the OS
+  location provider is now fully functional and degrades honestly on weak signal,
+  improving spoof resistance for on-Earth proofs. No change to the proof wire
+  format or public API.
+- **Rolling license-token persistence.** The SDK persists the refreshed license
+  token returned on lease responses, so a device holds a fresh token across
+  restarts within the offline-grace window.
+
+### Build & distribution
+
+- Releases now publish **SHA-256 checksums** and **SLSA build provenance**, an
+  **SBOM**, and a **keyless cosign signature** for the xcframework. See the
+  "Verifying the download" section in `INTEGRATION.md`.
+
 ## [1.1.0] — 2026-06-25
 
 > Feature release on top of 1.0.0. Backwards-compatible, drop-in upgrade: the
