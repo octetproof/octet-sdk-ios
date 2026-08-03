@@ -173,7 +173,7 @@ when the backend stops supporting the running SDK version. It carries an optiona
 update the app; a live session already running is unaffected. `LicenseStatus` also
 exposes non-fatal hints — `upgradeRecommended` and `minSupportedVersion` — that let
 you nudge an upgrade before the hard cutoff. (Version gating is dormant until
-enabled server-side, so you will not see these in 1.2.0 yet — wiring the handler
+enabled server-side, so you will not see these in 1.2.1 yet — wiring the handler
 now keeps you ready.)
 
 ---
@@ -237,8 +237,7 @@ Apple's unified logging system.
 Implement `LogSink` and pass it via `OctetConfig.logSink` to route the
 SDK's log lines into your own observability pipeline. Release builds
 default free-form interpolations to `.private` so coordinates and
-license fragments do not appear in plain text in system logs; use the
-SDK's debug-mode toggle if you need them visible during development.
+license fragments do not appear in plain text in system logs.
 
 ---
 
@@ -289,7 +288,7 @@ gh attestation verify OctetSDK.xcframework.zip \
 
 Steps 1–2 (checksum + keyless cosign signature) are the required verification and
 must both report success. Step 3 (`gh attestation verify`) applies only when a
-`.sigstore.json` build-provenance bundle is attached to the release — 1.2.0 ships
+`.sigstore.json` build-provenance bundle is attached to the release — 1.2.1 ships
 **without** one (a private-source-repo limitation, tracked in `octetproof/octet-sdk#169`),
 so skip step 3 if no bundle is present. Steps 2–3 use the attached files offline —
 the GitHub CLI and cosign are needed, but no special repository access.

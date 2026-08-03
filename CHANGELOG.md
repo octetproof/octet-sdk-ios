@@ -5,6 +5,28 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] — unreleased
+
+> **Security hotfix, released in lockstep with Android 1.2.1.** No new features and
+> **no change to the proof wire format, proof semantics, trust levels, or verdict
+> codes** — a 1.2.1 proof means exactly what a 1.2.0 proof means. The binary
+> hardening in 1.2.1 is Android-specific (the iOS framework is pure Swift); iOS ships
+> 1.2.1 to stay version-aligned and to remove `OctetConfig.debugMode`. **All consumers
+> should upgrade**; 1.0.0 / 1.1.0 / 1.2.0 are deprecated.
+>
+> _Release date stamped at tag time._
+
+### Removed (breaking)
+
+- **`OctetConfig.debugMode` (added in 1.2.0).** Removing it restores the safe default
+  in which a released SDK does not surface internal diagnostics through the host app.
+  **Breaking** for anyone who set it — the field existed for only one release.
+
+### Deprecated
+
+- **1.0.0, 1.1.0, and 1.2.0 are deprecated in favour of 1.2.1**, released in lockstep
+  with Android 1.2.1.
+
 ## [1.2.0] — 2026-07-29
 
 > Feature release on top of 1.1.0. Backwards-compatible, drop-in upgrade: the

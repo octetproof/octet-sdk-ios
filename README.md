@@ -12,7 +12,7 @@
 
 ```swift
 // 1. In Package.swift
-.package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.2.0")
+.package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.2.1")
 
 // 2. In your app code (inside an async context)
 import OctetSDK
@@ -47,7 +47,7 @@ In Xcode: **File → Add Packages…** with the repository URL, or in `Package.s
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.2.0")
+    .package(url: "https://github.com/octetproof/octet-sdk-ios", exact: "1.2.1")
 ]
 ```
 
