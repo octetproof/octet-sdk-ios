@@ -5,7 +5,7 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.2.1] — unreleased
+## [1.2.1] — 2026-08-03
 
 > **Security hotfix, released in lockstep with Android 1.2.1.** No new features and
 > **no change to the proof wire format, proof semantics, trust levels, or verdict
@@ -24,8 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Deprecated
 
-- **1.0.0, 1.1.0, and 1.2.0 are deprecated in favour of 1.2.1**, released in lockstep
-  with Android 1.2.1.
+- **All releases before 1.2.1 are deprecated in favour of 1.2.1** — the four
+  `0.0.x-alpha` previews and `1.0.0`, `1.1.0`, `1.2.0`, released in lockstep with
+  Android 1.2.1. Their downloadable artifacts have been **removed from the GitHub
+  release pages** for security; a build pinned to an old version must move to
+  **≥ 1.2.1**.
 
 ## [1.2.0] — 2026-07-29
 
