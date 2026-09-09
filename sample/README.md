@@ -1,72 +1,83 @@
-# OctetSample — iOS dev sample
+# OctetSample — iOS sample
 
-Minimal demo app exercising only the public v1 SDK surface
-(`Octet.start(...)` + `sdk.loc.isWithin(...)`). One button, one
-verdict. Pairs with `samples-public/android-sample/` on the Android
-side.
+A SwiftUI demo of the public v1 SDK surface, built around two tabs:
 
-This is the **dev-time copy**. It consumes the SDK source via a local
-SwiftPM path dependency (`path: ../../ios`) so SDK changes propagate
-to the sample immediately — no release roundtrip required. Use it to
-smoke-test new SDK features as you write them.
+- **Generate** — pick a region, watch the proof pipeline run (*SDK
+  initialized → sensors warmed up → location fixed → proof generated*,
+  with per-step timings and a map of your position), and get the
+  predicate answer (`sdk.loc.isWithin(...)`). The result card shows the
+  outcome, a confidence bucket, and the battery consumed by the run.
+  Generated proofs are kept in a sample-owned store.
+- **Verify** — run `Octet.verify(...)` on any stored or imported proof
+  and read the grouped on-device checks (signature, freshness,
+  hardware-attestation, …), with a one-line plain-language note on every
+  check that couldn't run and how to make it run. Pick a region to check
+  the proof's claim against, and see the granularity the proof reveals
+  (nothing finer than its level). Proofs can be exported / imported as
+  `.octetproof` files over AirDrop, Files, or the share sheet.
 
-A **consumer-facing copy** lives at `octet-sdk-ios/sample/` in the
-distribution repo. It consumes the published xcframework via SwiftPM
-URL; the release workflow mirrors source changes from here on every
-tagged release (see `.github/workflows/release-ios.yml`).
+## Setup (activation)
 
-## Setup (license key)
-
-The SDK won't start without a v1 license key. Get one at
-[api.octetproof.com/signup](https://api.octetproof.com/signup), or
-issue one from your own self-hosted activation backend. Then:
+**The SDK activates by attesting the app instance — there is no license key
+to paste.** On a real device it uses **Apple App Attest** and bootstraps its
+licence automatically on first launch. Copy the local config and set your
+activation server:
 
 ```bash
-# In samples-public/ios-sample/ :
+# From this directory:
 cp LocalConfig.swift.example LocalConfig.swift
-# Open LocalConfig.swift and paste your key into LocalConfig.licenseKey.
+# Open LocalConfig.swift and set your activation server URL.
 ```
 
-`LocalConfig.swift` is gitignored. If you skip this step the build
-fails with `cannot find 'LocalConfig' in scope` pointing at
-`ContentView.swift` — loud and clear.
+`LocalConfig.swift` is gitignored. If you skip this step the build fails
+with `cannot find 'LocalConfig' in scope` (from `AppModel.swift`) — loud
+and clear.
+
+**Run it on a real device — this sample is prod-only.** On a device with the
+**App Attest** capability provisioned for its bundle id, the SDK attests and
+bootstraps on first launch — nothing to paste (see **Build** below). The
+simulator, CI, and a locally built debug app can't produce production
+attestation; the SDK's sandbox-bootstrap path for those environments is covered
+in the repository's `INTEGRATION.md` but is intentionally not wired into this
+sample. Sign up at [octetproof.com](https://octetproof.com).
 
 ## Build
 
 `project.yml` is the canonical source; the `.xcodeproj` is gitignored
 and generated on demand. Install XcodeGen once (`brew install
-xcodegen`), then from `samples-public/ios-sample/`:
+xcodegen`), then from this directory:
 
 ```bash
 xcodegen generate
 open OctetSample.xcodeproj
-# or from the CLI:
+# or from the CLI (simulator):
 xcodebuild -project OctetSample.xcodeproj \
            -scheme OctetSample \
-           -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-           build
+           -destination 'generic/platform=iOS Simulator' \
+           -configuration Debug \
+           CODE_SIGNING_ALLOWED=NO build
 ```
 
-Bundle ID: `com.octetproof.sample`.
+Bundle ID: `com.octetproof.sample`. Deployment target: iOS 17.
 
-When running on a real device, set the **Apple Team ID** in the
-target's *Signing & Capabilities* panel. Required `Info.plist`
-entries are already in place (`NSLocationWhenInUseUsageDescription`
-for the location pipeline, `NSMotionUsageDescription` because the SDK
-touches `CMMotionActivityManager` at init).
+When running on a real device, set your **Apple Development Team** in
+the target's *Signing & Capabilities* panel and provision an App ID
+carrying the **App Attest** capability for the bundle id (the SDK
+exercises Apple App Attest when the entitlement is present, and
+degrades gracefully when it isn't). Required `Info.plist` entries are
+already in place — `NSLocationWhenInUseUsageDescription` (the location
+pipeline) and `NSMotionUsageDescription` (motion feeds proof
+confidence).
 
-## What it does
+> The proof pipeline needs real sensors: motion, GNSS, and cellular
+> inputs are only present on a **physical device** — the simulator has no
+> real motion / GNSS / cellular hardware.
 
-1. Requests `LocationWhenInUseUsageDescription`.
-2. Calls `try await Octet.start(config: OctetConfig(licenseKey:
-   LocalConfig.licenseKey))`. The SDK verifies the license key, hits
-   `/v1/activate` if needed, caches the activation token in Keychain,
-   then brings up the proof pipeline.
-3. On tap, runs `await sdk.loc.isWithin(region: .country(isoCode:
-   "US"), atTime: Date())` and renders the verdict (`result` /
-   `reason` / `message` / whether a proof attached).
+## Files
 
-Source: `ContentView.swift`. Imports `OctetSDK` (the SwiftPM
-target inside the wrapper); the consumer-facing copy in
-`octet-sdk-ios/sample/` rewrites this to `OctetSDK` (the published
-wrapper framework) during the release-mirror step.
+| Area | Files |
+|---|---|
+| App shell / model | `OctetSampleApp.swift`, `RootView.swift`, `AppModel.swift`, `AppSettings.swift` |
+| Generate | `GenerateView.swift` (pipeline, map, curated debug feed) |
+| Verify + proofs | `VerifyView.swift`, `VerifyDetailView.swift`, `ViewRawView.swift`, `ImportPreviewView.swift`, `ProofStore.swift`, `ProofFile.swift`, `Models.swift` |
+| Shared | `Theme.swift`, `Regions.swift`, `LocalConfig.swift.example` |

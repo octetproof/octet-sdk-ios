@@ -5,6 +5,192 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] — 2026-09-09
+
+> Major release, in lockstep with Android 2.0.0. Two things make it major.
+> First, **how the SDK activates has changed**: at `Octet.start` it now proves the
+> running app instance with **Apple App Attest** and obtains its licence by
+> attested bootstrap, replacing the pasted-license-key activation step. Second, the
+> proof surface grows — a public on-device **verifier** (`Octet.verify`), a public
+> teardown (`OctetSdk.close()`), a cache-bypass (`forceFresh`), an experimental
+> permissionless location estimate — and **semantic-binding v2 becomes the default
+> proof form**. **Read _Changed (breaking)_ before upgrading:** beyond the
+> activation change, one JSON flag spelling changed, and two verdicts now refuse
+> where they previously returned a misleading positive.
+>
+> _Released 2026-09-09._
+
+### Changed (breaking)
+
+- **Attested activation replaces the license-key flow.** `Octet.start` no longer
+  activates by sending a pasted license key to an activation endpoint. It now
+  proves the running app instance with **Apple App Attest** and bootstraps its
+  licence from the backend. A host that cannot attest — the simulator, CI, or a
+  locally built debug app — sets `OctetConfig.sandboxBypassToken` and bootstraps
+  through the sandbox path instead; a device with neither attestation nor a sandbox
+  token fails closed. `OctetConfig.licenseKey` remains a field for now but is no
+  longer the credential that activates the SDK. **This is an integration-level
+  change:** an app that relied on a license key alone must be provisioned for App
+  Attest (or carry a sandbox token for non-device builds).
+
+- **`confidence.flags` values in `toJson()` / `toJsonl()` are now `UPPER_SNAKE`.**
+  iOS emitted Swift case names where Android emitted upper-snake, in an output
+  documented as wire-stable — so the same flag read differently depending on which
+  platform produced it.
+
+  | Before (iOS) | Now (both platforms) |
+  |---|---|
+  | `unspecified` | `UNSPECIFIED` |
+  | `vpnActive` | `VPN_ACTIVE` |
+  | `airplaneMode` | `AIRPLANE_MODE` |
+  | `uncertaintyHigh` | `UNCERTAINTY_HIGH` |
+
+  **Migration:** affects only callers parsing `toJson()` / `toJsonl()` on iOS. The
+  typed `ConfidenceSummary.flags` is unchanged, as is `toStr()`. Android is
+  unaffected — it already emitted these spellings.
+
+### Added
+
+- **`Octet.verify(...)` — public on-device proof verification.** An offline
+  verifier that checks a proof's signature, freshness, semantic binding, and
+  hardware-attestation anchoring, and returns a grouped, human-readable result
+  naming every check that ran and every check that could not — and why. It makes no
+  network call and needs no backend, so a relying party can reach a local trust
+  decision, or triage a proof before forwarding it. The authoritative end-to-end
+  verifier remains the standalone `octet-verify` CLI; `Octet.verify` runs the same
+  checks in-process.
+
+- **Hardware-attestation anchoring in the verifier.** `Octet.verify` can anchor a
+  proof's device key to the platform hardware root — Apple's App Attest root — so a
+  verified proof carries evidence it came from a genuine app instance on genuine
+  hardware, not merely that its signature checks out.
+
+- **`OctetSdk.close()` — public teardown.** Stops all SDK activity — location
+  monitoring, the background heartbeat, any in-flight upload — and releases the
+  handle, so a host that needs the SDK for only part of its lifecycle can shut it
+  down cleanly rather than leave it running. Idempotent.
+
+- **`forceFresh` on `isWithin` / `isOutside` / `contains`.** An optional flag that
+  bypasses the short-lived proof-reuse cache and forces a freshly measured proof
+  for this call — for a caller that needs a just-now measurement rather than a
+  buffered one. Omitted (the default), behaviour is unchanged: the cache is
+  consulted.
+
+- **Permissionless location estimate (experimental, opt-in).** With
+  `advanced.enableLocationEstimator`, a predicate made while the app holds no
+  location permission returns a signed, coarse `OctetVerdict.estimate` instead of
+  failing outright. `OctetVerdict.proof` is always `nil` on that path, and a verdict
+  never carries both — so an estimate can never be read as a proof. **This is not a
+  proof pathway:** the radii are conservative bounds, not measured error, and
+  consent for deriving location remains yours.
+
+- **`regionFromJson`.** The inverse of `OctetRegion.toJson()` / `toJsonl()`:
+  decodes the same stable tagged shape the forward direction emits, round-tripping
+  every factory. It exists so a non-native caller — React Native, a server payload,
+  a stored region — can hand a region across a language boundary without
+  re-modelling seven shapes on the far side.
+
+  Input is treated as untrusted, so unlike the region factories it always throws
+  `OctetRegion.DecodeError` on malformed, missing, wrong-typed or out-of-range
+  input, and never traps. `disc` has no tag of its own (it round-trips through
+  `ellipse`), and H3 cells are hex strings rather than JSON numbers, because an H3
+  index exceeds the exact-integer range of a JSON number.
+
+- **`decisionRef` on `isWithin` / `isOutside` / `contains`.** An optional opaque
+  decision identifier (host-minted, ≤256 chars) that binds a generated proof to one
+  specific authorization decision, letting a relying party fetch and trust a proof
+  for exactly that decision. Additive and backwards-compatible: the default `nil`
+  is unchanged behaviour and the upload envelope stays `schema_version: 2`.
+
+- **Remote configuration — `sdk.flags`.** A read-only surface: `getBoolean` /
+  `getInt` / `getString(key, default)` and `getAssignment(experiment)`, backed by a
+  signed bundle fetched at `start()` and refreshed on each heartbeat, cached
+  last-good. Default-on via `OctetConfig.flagsEnabled`. Entirely fail-safe — a
+  disabled subsystem, no bundle, or an unknown or wrong-typed key all return the
+  default you supplied.
+
+- **New refusal reason `regionUnresolved`.** Returned when a region genuinely
+  cannot be resolved at the required confidence — an honest "couldn't measure",
+  deliberately distinct from a detected spoof.
+
+### Changed
+
+- **semantic-binding v2 is now the default proof form.** A proof now binds its
+  semantic fields — level, region type, integrity status, and the position-
+  commitment geometry — under the v2 scheme by default, hardening it against
+  post-hoc field edits. A current `octet-verify` accepts both the v1 and v2 forms;
+  verifying a v2 proof needs an up-to-date verifier.
+
+- **The App Attest assertion binds the Secure-Enclave signing key.** The iOS App
+  Attest assertion now commits to the device's Secure-Enclave signing key, tying
+  the attested app instance to the exact key that signs its proofs.
+
+- **Telemetry hardened.** The optional anonymous usage counters — on by default, no
+  location data, unchanged in shape since 1.1.0 — are now encrypted at rest on the
+  device, their upload sample rate can be tuned by remote configuration, and a
+  fresh install no longer uploads a report before its first activity. Disable all
+  of it with `OctetConfig.telemetryEnabled = false`.
+
+- **A country or subdivision proof now claims where the device *is*, not what was
+  *queried*.** `isWithin(country("XX"))` previously stamped the queried region into
+  the proof's claim, which made a decision-bound country predicate able to answer
+  only `YES`. The claim is now derived from the estimate, with granularity clamped
+  to the query — never finer, so no street-level geometry leaks out of a country
+  predicate — and decision binding moves entirely onto `challenge_decision_ref` and
+  `region_ref`.
+
+  **Expect more refusals at first.** A country-level decision whose honest claim
+  differs from the queried country now fails closed. That is the intended
+  behaviour, not a regression: the previous answer was tautological.
+
+### Security
+
+Brief — each hardens a case that previously produced a misleading positive:
+
+- **A software-simulated location is refused, not proven** — such a fix now yields
+  `INDETERMINATE` with `mockLocationDetected`, never a positive proof. An external
+  GPS accessory is still treated as legitimate.
+- **An unavailable cross-check no longer counts as agreement** — a corroborating
+  signal that cannot be measured is recorded as unverifiable, not as confirmation.
+- **Refusal reasons distinguish adversarial from benign** — a detected spoof
+  carries an adversarial reason (`mockLocationDetected`, `spoofingDetected`,
+  `tampering`, `attestationFailed`), machine-distinguishable from the benign
+  couldn't-measure reasons, so a policy layer can treat them differently.
+- **IP geolocation is no longer promoted to a country anchor** — an IP-derived
+  country no longer stands in for a measured one.
+
+### Fixed
+
+- **`toJson()` / `toJsonl()` now emit the real proof.** Both platforms emitted a
+  placeholder in place of `proof` and `confidence`, so a JSON consumer received a
+  `YES` verdict carrying no proof bytes at all. `proof` now carries `id`, `level`,
+  `timestamp_ms`, `sdk_version`, `platform`, `confidence`,
+  `position_commitment_b64` and `proof_bytes_b64`, and `achievable_level` is now
+  emitted at the top level. `claimedRegion` stays absent — it already travels
+  inside the proof bytes. No typed API change.
+
+- **A decision-bound call no longer returns a proof minted without that decision.**
+  `isWithin` / `isOutside` / `contains` with a `decisionRef` could return a
+  buffered, non-decision-bound proof, so no decision-scoped proof was ever
+  uploaded and a relying party's fetch-by-decision found nothing and denied. The
+  freshness buffer is now consulted only when neither a session nonce nor a
+  decision reference is set.
+
+- **`Octet.start` no longer stalls the main thread during device attestation.** The
+  attestation step now runs off the main actor, so a slow attestation can no longer
+  cause an app-not-responding hang at launch.
+
+- **The first proof upload after a fresh activation is reliable.** A transient
+  device-identity mismatch that could make the very first upload retry once before
+  succeeding is resolved, so the first proof uploads cleanly.
+
+- **The activation bearer is refreshed against its real expiry.** The SDK assumed a
+  ~24 h window against a backend token that actually lives ~1 h, so authenticated
+  calls could be rejected with `401` after the first hour of a session. The SDK now
+  honours the token's real expiry, treats it as expired 30 s early, and refreshes
+  at a cadence derived from that lifetime. Sessions established before this change
+  fall back to the previous behaviour, so upgrades are seamless.
+
 ## [1.2.1] — 2026-08-03
 
 > **Security hotfix, released in lockstep with Android 1.2.1.** No new features and
@@ -68,13 +254,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`OctetConfig.debugMode`.** New opt-in config field (default `false`). When
   `true`, the SDK unlocks its verbose diagnostics-capture tier in a **release**
   build for a support deep-dive — previously only available in a debug build of
-  the SDK. Client-side only; PII discipline unchanged. (#163)
+  the SDK. Client-side only; PII discipline unchanged.
 - **Session-binding for logins.** `isWithin` / `isOutside` / `contains` gain an
   optional `sessionNonce: Data?`. Pass the one-time nonce your login backend issued
   and it's committed inside the signed proof, so your verifier can confirm the proof
   was made *for that specific login*; forward the returned `verdict.proof` to your
   backend. Only a hash of the nonce is serialized (never the raw bytes); omitting it
-  preserves 1.1.0 behaviour exactly. Enforcement needs octet-verify ≥ 1.2.0. (#128)
+  preserves 1.1.0 behaviour exactly. Enforcement needs octet-verify ≥ 1.2.0.
 
 ### Changed
 
