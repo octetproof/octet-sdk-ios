@@ -3,8 +3,8 @@ import Combine
 
 /// Sample preferences, persisted in `UserDefaults`. Split into two tiers:
 ///  - **release** toggles are harmless and always present;
-///  - **debug** toggles (`semanticV2`, `verboseLogs`) are wrapped in `#if DEBUG`
-///    everywhere they're read *and* set, so they are compiled out of a release
+///  - the **debug** toggle (`verboseLogs`) is wrapped in `#if DEBUG`
+///    everywhere it's read *and* set, so it is compiled out of a release
 ///    build entirely — a customer who discovers the hidden menu never sees them.
 @MainActor
 final class AppSettings: ObservableObject {
@@ -19,7 +19,6 @@ final class AppSettings: ObservableObject {
 
     #if DEBUG
     // Debug-tier — compiled OUT of release builds.
-    @Published var semanticV2: Bool { didSet { save(\.semanticV2, semanticV2) } }
     @Published var verboseLogs: Bool { didSet { save(\.verboseLogs, verboseLogs) } }
     #endif
 
@@ -31,7 +30,6 @@ final class AppSettings: ObservableObject {
         uploadsEnabled = d.object(forKey: "uploadsEnabled") as? Bool ?? true
         devMenuUnlocked = d.object(forKey: "devMenuUnlocked") as? Bool ?? false
         #if DEBUG
-        semanticV2 = d.object(forKey: "semanticV2") as? Bool ?? false
         verboseLogs = d.object(forKey: "verboseLogs") as? Bool ?? false
         #endif
     }
@@ -45,7 +43,6 @@ final class AppSettings: ObservableObject {
         case \AppSettings.uploadsEnabled: name = "uploadsEnabled"
         case \AppSettings.devMenuUnlocked: name = "devMenuUnlocked"
         #if DEBUG
-        case \AppSettings.semanticV2: name = "semanticV2"
         case \AppSettings.verboseLogs: name = "verboseLogs"
         #endif
         default: return
