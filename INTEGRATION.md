@@ -140,8 +140,7 @@ them).** When enabled by remote configuration, the SDK adds a set of richer
 **aggregate** signals:
 
 - **Per-proof events** — one flat record per proof, every field a bucketed **enum
-  label** (level, region-resolution trust, which signal anchored the estimate,
-  agreement bucket, geocoder outcome). The one field beyond pure enums is a coarse
+  label** (the proof level and internal quality labels). The one field beyond pure enums is a coarse
   **region identity** — an **ISO 3166 country / subdivision code** (e.g. `US`,
   `GB-ENG`), never finer than the level the proof already claims and bounded to
   ISO 3166 space, not free text. Still no coordinates.
@@ -149,13 +148,235 @@ them).** When enabled by remote configuration, the SDK adds a set of richer
   caught at the SDK's public API boundary, with any message mapped to a fixed enum
   (`license` / `region_decode` / … / `unknown`) — never the raw message, never
   PII; capped at 50 distinct pairs.
-- **Permissionless-estimate signals** — bucketed signals from the opt-in
-  permissionless location-estimate pathway; the OS permission status is **read,
-  never requested**, and no coordinates are collected.
 
 **Your control.** All of the above — base and gated — stops entirely when
 `telemetryEnabled = false`: no counters are recorded, the persisted file is
 deleted, and `/v1/metrics` is never called.
+
+---
+
+## Usage reporting
+
+Octet bills per active device. To count devices, the SDK sends **one usage record
+per device per UTC day**: after the first proof the app generates that day, it
+queues a single `device_active` record and sends it with the next background
+heartbeat. Later proofs that day send nothing more.
+
+**What it contains.** The operation name, a timestamp and a record ID. The ID is a
+one-way SHA-256 hash of the device's opaque activation fingerprint and the date, so it
+changes every day and lets the server ignore duplicates. The device is counted from the
+activation credentials the SDK already holds. **No location, no coordinates, no proof
+data, no user or account identity, and no new device identifier.**
+
+**It never affects a proof.** The record is written after the proof exists and needs
+no network at that moment. A failed send is retried on later heartbeats, and a record
+that could not be sent within 30 days is dropped. A sandbox session sends nothing.
+
+**It is always on.** Reporting can't be switched off. `OctetConfig.creditServiceUrl` defaults to
+`https://credits.octetproof.com`; set it only to point a test build at another
+environment. Setting it to `nil` does not disable reporting.
+
+---
+
+## Routing all SDK traffic through your own gateway
+
+By default the SDK talks to the Octet backend at `api.octetproof.com` and, for a
+couple of enrichment calls, to a third-party host (IP-geolocation on iOS; GNSS
+broadcast-ephemeris servers on Android). If your app's network surface is audited
+— a firewall allowlist, an app-store network disclosure, or a "the app only talks
+to our own domain" policy — you can route **every** SDK request through a reverse
+proxy you operate, so the only backend the app visibly contacts is yours.
+
+Choose the mode at `start()`:
+
+```swift
+let config = OctetConfig(
+    licenseKey: "octet_live_v4.…",
+    advanced: AdvancedConfig(
+        transport: TransportPolicy(
+            mode: .integratorGateway,
+            gateway: "https://api.example.com/octet")))
+```
+
+The SDK then sends every request to `{gateway}{path}`; your proxy forwards each
+path to its upstream and returns the response unchanged. Activation, verification,
+and proof/flag signing still terminate at Octet — the proxy is a plain forwarder,
+so trust is unchanged and only the network topology moves.
+
+### Consolidate onto Octet's own gateway instead (`octetGateway`)
+
+If you want a single consolidated backend domain but would rather **not run a proxy
+yourself**, select `octetGateway`. The SDK routes every call — first-party *and* the
+third-party enrichment — through Octet's own hosted gateway, so
+the app's only backend domain becomes that one Octet host:
+
+```swift
+let config = OctetConfig(
+    licenseKey: "octet_live_v4.…",
+    advanced: AdvancedConfig(transport: .octetGateway))   // or TransportPolicy.octetGateway
+```
+
+There is **no `gateway` to supply** — the host is built in, and any value you set is
+ignored — and nothing for you to operate. `octetGateway` uses standard
+certificate-authority validation (TLS pinning is **off**); the `pins` field is ignored
+in this mode — it applies only to the app→proxy hop of `integratorGateway`. The
+`fallbackToDirect` option and the two notes below (the `/ext/geo/…` route, the IP hint) apply
+here just the same. Everything from here on describes `integratorGateway`, the
+run-your-own-proxy mode.
+
+### What your proxy must forward
+
+| The SDK sends (under your gateway) | Forward it to | Notes |
+|---|---|---|
+| `/v1/activate`, `/v1/heartbeat`, `/v1/deactivate` | `https://api.octetproof.com/v1/…` | signed bodies — never modify |
+| `/v1/flags`, `/v1/metrics`, `/v1/credits/…` | `https://api.octetproof.com/v1/…` | flag bundles are signed — never modify |
+| `/v1/proofs`, `/v1/proofs/auth`, `/v1/proofs/challenge` | `https://api.octetproof.com/v1/…` | proof body up to 256 KiB — never modify |
+| `/ext/ipgeo/…` | optional, see "IP-based country hint" below | **iOS SDK only** — IP location hint |
+| `/ext/gnss/…` | `https://cddis.nasa.gov/archive/gnss/data/daily/…` (fallback `https://igs.ign.fr/pub/igs/data/…`) | **Android SDK only** — GNSS ephemeris (large files; may need NASA Earthdata credentials) |
+| `/ext/geo/…` | `https://api.octetproof.com/ext/geo/…` | **both SDKs**. **First-party & bearer-authed** — forward it like a `/v1/…` route (preserve `Authorization`, send `Host: api.octetproof.com`), not like the third-party `ext` routes above. |
+
+Forward the third-party `/ext/gnss/` route only if you embed the Android SDK; `/ext/geo/…` is first-party and applies to both.
+
+**Contract:**
+
+- **Preserve the request verbatim** — method, the path after the prefix, the query
+  string, and all headers, especially `Authorization`, `Content-Type`, and any
+  `X-Octet-…` header.
+- **Never modify the body** of `/v1/proofs`, `/v1/flags`, or `/v1/activate`: each
+  signature is over the exact bytes, so any rewrite — even re-serialising the JSON
+  — breaks verification.
+- **Use TLS 1.2 or higher to the upstream**, verify the upstream certificate, and
+  send `Host: api.octetproof.com` (and matching SNI) on the first-party routes.
+- **Pass status codes and the `Retry-After` header through unchanged** — the SDK
+  honours `429`.
+- **Don't cap the request body below 256 KiB**, and give the upstream at least as
+  generous a timeout as you give the SDK (activation and attestation can be slow).
+
+### Reference configurations
+
+Replace `api.example.com/octet` with your own gateway base URL, and keep only the
+`ext` block for the platform(s) you ship.
+
+**nginx**
+
+```nginx
+# All first-party routes are under /v1/ — activation, flags, metrics, credits,
+# proofs (incl. /v1/proofs/auth + /v1/proofs/challenge), and network-observe.
+location /octet/v1/ {
+    proxy_pass                  https://api.octetproof.com/v1/;
+    proxy_ssl_server_name       on;
+    proxy_set_header Host       api.octetproof.com;
+    proxy_pass_request_headers  on;
+    client_max_body_size        256k;
+}
+# Android apps only:
+location /octet/ext/gnss/  { proxy_pass https://cddis.nasa.gov/archive/gnss/data/daily/; proxy_ssl_server_name on; }
+# All apps (first-party, bearer-authed):
+location /octet/ext/geo/   { proxy_pass https://api.octetproof.com/ext/geo/; proxy_ssl_server_name on; proxy_set_header Host api.octetproof.com; }
+```
+
+**Cloudflare Worker**
+
+```js
+const UPSTREAM = {
+  "/v1/":        "https://api.octetproof.com/v1/",                   // all first-party (incl. /v1/proofs/auth, /v1/proofs/challenge)
+  "/ext/gnss/":  "https://cddis.nasa.gov/archive/gnss/data/daily/",  // Android apps
+  "/ext/geo/":   "https://api.octetproof.com/ext/geo/",              // all apps (first-party)
+};
+
+export default {
+  async fetch(request) {
+    const url = new URL(request.url);
+    const path = url.pathname.replace(/^\/octet/, "");   // strip your gateway prefix
+    const match = Object.entries(UPSTREAM).find(([prefix]) => path.startsWith(prefix));
+    if (!match) return new Response("not found", { status: 404 });
+    const [prefix, base] = match;
+    const target = base + path.slice(prefix.length) + url.search;
+    // Forward method, headers, and body untouched; return the upstream response as-is.
+    return fetch(target, {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      redirect: "follow",
+    });
+  },
+};
+```
+
+**AWS** — two common patterns:
+
+- **API Gateway (HTTP API):** add one HTTP-proxy integration per prefix — e.g.
+  route `ANY /octet/v1/{proxy+}` to `https://api.octetproof.com/v1/{proxy}`, and
+  one each for `/octet/ext/geo/` (all apps) and `/octet/ext/gnss/` (Android). Leave
+  request-parameter mapping untouched so headers and the query string pass through
+  unchanged.
+- **CloudFront:** define one origin per upstream and one cache behaviour per path
+  pattern (`/octet/v1/*`, `/octet/ext/geo/*`, `/octet/ext/gnss/*`). Attach an origin-request policy that forwards **all**
+  headers, query strings, and cookies, and the managed `CachingDisabled` cache
+  policy so nothing is buffered or rewritten. Set each origin to HTTPS-only.
+
+### Two things to know
+
+- **Certificate pinning:** the default pin set (next section) pins Octet's
+  certificate, which no longer applies once traffic flows through your proxy — the
+  app sees **your** certificate, not Octet's. To keep pin-level protection on the
+  app→gateway hop, pass your proxy's own SPKI pins in the transport policy:
+
+  ```swift
+  transport: TransportPolicy(
+      mode: .integratorGateway,
+      gateway: "https://api.example.com/octet",
+      pins: ["<base64-sha256-of-your-proxy-SPKI>", "<backup-pin>"])
+  ```
+
+  Compute a pin with `openssl x509 -in cert.pem -pubkey -noout | openssl pkey
+  -pubin -outform DER | openssl dgst -sha256 -binary | openssl enc -base64`.
+  **Pin a stable point in the chain — a CA intermediate or root — not an
+  auto-rotating leaf:** a managed certificate (Cloudflare, ACME / Let's Encrypt)
+  re-keys on renewal, which breaks a leaf-SPKI pin the next time it rotates. Always
+  include a backup pin. Leave `pins` empty (the default) to rely on standard
+  certificate-authority validation only.
+- **Availability — optional fallback to direct (`fallbackToDirect`, default off):**
+  if you'd rather the SDK keep working through a gateway *outage* than fail closed,
+  set `fallbackToDirect: true`. After repeated transport-level failures to your
+  gateway (connect / TLS / DNS / timeout — never HTTP status errors), the SDK
+  temporarily reverts the **critical calls** (activation, proof upload, credit) to
+  Octet directly, then re-probes your gateway and switches back once it recovers.
+  **This suspends the single-domain guarantee while active** — during the outage
+  those calls talk to `api.octetproof.com` directly — so a strict-compliance
+  deployment should leave it **off** (the default). Telemetry + flags always stay
+  gateway-only.
+
+  ```swift
+  transport: TransportPolicy(
+      mode: .integratorGateway,
+      gateway: "https://api.example.com/octet",
+      fallbackToDirect: true,      // opt in to outage resilience (default false)
+      fallbackAfterFailures: 3)    // consecutive transport failures before it trips
+  ```
+- **Zero Apple attestation calls, at the cost of un-attested proofs (`osAttestationInGatewayModes`, default on):**
+  in a gateway mode the SDK still runs per-proof **App Attest** (→Apple) by default — an
+  OS call that can't be proxied. Set `osAttestationInGatewayModes: false` to skip it, so
+  the app makes **zero** Apple attestation calls. The trade-off is deliberate and visible
+  on the wire: those proofs are signed by the device key but are not
+  hardware-*attested*, and a verifier reports them `attested: false` — its
+  attestation-required gate **fails** them. Gate your own acceptance on the proof's
+  `attested` flag, **not** on validity; any "must be hardware-attested" policy belongs in
+  your verifier / license issuance, not in what the SDK emits. Bootstrap/activation still
+  attests, so the app still activates.
+
+  ```swift
+  transport: TransportPolicy(
+      mode: .octetGateway,
+      osAttestationInGatewayModes: false)   // skip App Attest → un-attested proofs
+  ```
+- **Forward `/ext/geo/…` too:** without it, country and state proofs return
+  `INDETERMINATE` unless `fallbackToDirect` is on.
+- **IP-based country hint:** with your own gateway (`integratorGateway`), Octet
+  provides no upstream for `/ext/ipgeo/`. Leave that route unrouted, or set
+  `TransportPolicy.thirdParty = .disable` so the SDK skips the lookup. The hint is
+  optional, and a proof is still produced either way. `.octetGateway` serves the
+  hint itself.
 
 ---
 
@@ -192,6 +413,27 @@ can decide what to accept per the trust requirements of the
 integration. The SDK does not refuse to operate when only `SOFTWARE`
 storage is available — it generates honest proofs at the level
 actually achieved, and the acceptance decision lives at the verifier.
+
+---
+
+## Reading a containment result's assurance tier
+
+`contains(...)` / `isWithin(.disc(...))` return a disc-shaped area proof, and
+that proof carries an **assurance tier** you should read before treating a `YES`
+as authoritative. Read it from `proof.spoofingVerdict` (or `spoofing_verdict` in
+`proof` JSON):
+
+| Tier | What a `YES` means |
+|---|---|
+| `VERIFIED` | Corroborated: independent evidence supports the fix. |
+| `PLAUSIBLE` | Lower assurance: the fix is consistent with your query but is **not** independently corroborated. |
+
+An iOS area proof is `PLAUSIBLE` at best in this release. Opt in with
+`OctetConfig.advanced.acceptPlausibleContainment = true` to receive a `PLAUSIBLE`
+disc; with it off (the default) a disc query returns `INDETERMINATE` rather than
+a lower-assurance `YES`, preserving the stricter contract for existing callers.
+Tight tolerances only pass with a tight location fix. Gate on the tier that
+your use case requires; do not treat the region granularity alone as assurance.
 
 ---
 
@@ -239,7 +481,8 @@ now keeps you ready.)
 ## Privacy manifest
 
 The xcframework bundles a `PrivacyInfo.xcprivacy` declaring the SDK's collected data
-types (precise/coarse location, device identifier, aggregate usage counters) and its
+types (precise/coarse location, device identifier, usage counters and the daily usage
+record) and its
 required-reason API usage (System Boot Time for the anchored license clock; UserDefaults
 for a one-time device-id migration). Xcode aggregates it automatically into your app's
 privacy report at build time — no action needed. Review it alongside your app's own
@@ -265,6 +508,27 @@ confirms the proof was made for that specific login; an older verifier simply
 ignores the binding (NOT-CHECKED). `sessionNonce` must be **1…512 bytes** — empty or
 larger returns an `invalidSessionNonce` verdict with no proof and no network call.
 Omit it entirely for normal, cacheable proofs (behaviour is unchanged from 1.1.0).
+
+---
+
+## Keeping your verifier current
+
+If your backend verifies proofs itself with `octet-verify`, upgrade it to
+**octet-verify ≥ 1.5.0** before you adopt a future OctetSDK release that switches
+proofs to **semantic-binding v3**. v3 also signs the region a proof was asked about,
+so your verifier can read the device's signed inside/outside answer for that region.
+A verifier older than 1.5.0 reports the `semantic-binding` check as FAIL for every v3
+proof.
+
+1.5.0 is available now and verifies earlier proofs too (v3, then v2, then v1), so
+upgrading ahead of time is safe. The SDK's own `Octet.verify` already handles v3.
+Release notes will say which OctetSDK release turns v3 on.
+
+**Gate on the signed verdict, not on `isValid` alone.** A disc answer (`contains()` or
+`isWithin(.disc(...))`) can be signed `VERIFIED` or `PLAUSIBLE`, and both verify. On your
+backend, octet-verify ≥ 1.6.0 enforces a tier with `--require-verdict verified` (or
+`plausible`). On the device, `Octet.verify` does the same with
+`VerifyOptions(requireVerdict: .verified)`, and reports the signed tier as `ProofVerification.spoofingVerdict`.
 
 ---
 
@@ -346,9 +610,8 @@ gh attestation verify OctetSDK.xcframework.zip \
 
 Steps 1–2 (checksum + keyless cosign signature) are the required verification and
 must both report success. Step 3 (`gh attestation verify`) applies only when a
-`.sigstore.json` build-provenance bundle is attached to the release — 2.0.0 ships
-**without** one (a private-source-repo limitation, tracked in `octetproof/octet-sdk#169`),
-so skip step 3 if no bundle is present. Steps 2–3 use the attached files offline —
+`.sigstore.json` build-provenance bundle is attached to the release. Current releases
+ship **without** one, so skip step 3 if no bundle is present. Steps 2–3 use the attached files offline —
 the GitHub CLI and cosign are needed, but no special repository access.
 
 ---

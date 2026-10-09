@@ -78,6 +78,6 @@ confidence).
 | Area | Files |
 |---|---|
 | App shell / model | `OctetSampleApp.swift`, `RootView.swift`, `AppModel.swift`, `AppSettings.swift` |
-| Generate | `GenerateView.swift` (pipeline, map, curated debug feed) |
+| Generate | `GenerateView.swift` (pipeline, map, result) |
 | Verify + proofs | `VerifyView.swift`, `VerifyDetailView.swift`, `ViewRawView.swift`, `ImportPreviewView.swift`, `ProofStore.swift`, `ProofFile.swift`, `Models.swift` |
-| Shared | `Theme.swift`, `Regions.swift`, `LocalConfig.swift.example` |
+| Shared | `Theme.swift`, `Regions.swift`, `InfoButton.swift`, `LocalConfig.swift.example` |

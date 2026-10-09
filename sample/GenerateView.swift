@@ -3,14 +3,9 @@ import MapKit
 import OctetSDK
 
 /// The Generate tab: the live (approximated) pipeline with timings, region
-/// picker, map, the Generate button, the predicate result card, and the
-/// expandable sanitized debug feed.
+/// picker, map, the Generate button and the predicate result card.
 struct GenerateView: View {
     @EnvironmentObject var model: AppModel
-    var onTitleTap: () -> Void
-    var onOpenDevMenu: () -> Void
-
-    @State private var showDebug = false
 
     var body: some View {
         ScrollView {
@@ -31,7 +26,7 @@ struct GenerateView: View {
                     ResultCard(result: result)
                         .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
                 }
-                debugSection
+                ChannelGenerateExtras()
             }
             .padding(Theme.Space.l)
             // A fresh run is unmistakable: the old card animates out on tap and the
@@ -49,18 +44,12 @@ struct GenerateView: View {
                 Text("Octetproof").font(.title2.bold())
                 Text("· Sample").font(.title3).foregroundStyle(.secondary)
                 Spacer()
-                if model.settings.devMenuUnlocked {
-                    Button(action: onTitleTap) {
-                        Image(systemName: "gearshape").foregroundStyle(.secondary)
-                    }.accessibilityLabel("Developer settings")
-                }
+                ChannelHeaderAccessory()
             }
             Text("SDK v\(Octet.sdkVersion) · \(model.licenseLine.isEmpty ? model.sdkState.label : model.licenseLine)")
                 .font(.caption).foregroundStyle(.secondary)
         }
-        // 5 taps on the title area unlocks the hidden dev menu.
-        .contentShape(Rectangle())
-        .onTapGesture(perform: onTitleTap)
+        .channelTitleTap()
     }
 
     private var regionRow: some View {
@@ -115,32 +104,6 @@ struct GenerateView: View {
         }
         .tint(Theme.accent)
         .disabled(model.isGenerating)
-    }
-
-    private var debugSection: some View {
-        DisclosureGroup(isExpanded: $showDebug) {
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(model.debug.suffix(50)) { line in
-                    Text("\(Self.hms(line.time))  \(line.text)")
-                        .font(Theme.mono(11)).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                Text("no coordinates · keys · tokens · IDs shown")
-                    .font(.caption2).foregroundStyle(.tertiary).padding(.top, 4)
-            }
-            .padding(.top, Theme.Space.s)
-        } label: {
-            Label("Debug output (\(model.debug.count))", systemImage: "terminal")
-                .font(.subheadline)
-        }
-        .tint(Theme.accent)
-        .opacity(model.settings.showDebug ? 1 : 0)
-        .frame(height: model.settings.showDebug ? nil : 0)
-        .disabled(!model.settings.showDebug)
-    }
-
-    static func hms(_ d: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f.string(from: d)
     }
 }
 

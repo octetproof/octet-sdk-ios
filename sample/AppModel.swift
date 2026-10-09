@@ -84,12 +84,6 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var forceFresh = false
     @Published var lastResult: GenerateResult?
     @Published var debug: [DebugLine] = []
-    /// The SDK's own public log stream (lifecycle / verdicts / errors), captured
-    /// live when "Verbose SDK logs" is enabled in the hidden Dev menu. `PublicLog`
-    /// is the SDK's PII-disciplined public surface — never internal signals /
-    /// weights / scores, never coordinates / keys / identifiers — so surfacing it
-    /// here is leak-safe. Only wired in DEBUG (the toggle is compiled out of release).
-    @Published var sdkLog: [DebugLine] = []
     /// Set when a `.octetproof` arrives (share/AirDrop/import) → drives the preview sheet.
     @Published var pendingImport: ProofEnvelope?
 
@@ -105,9 +99,6 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
     private var startTask: Task<Void, Never>?
 
-    private lazy var sdkLogSink = SampleLogSink { [weak self] line in self?.appendSDKLog(line) }
-    private var sdkLogInstalled = false
-
     // Region-picker defaulting: seed the picker from the device's GPS country on
     // the first fix, unless the user has already chosen one.
     private var didAutoSelectCountry = false
@@ -120,7 +111,6 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         steps = baseSteps()
-        applyVerboseLogging()   // honour a persisted "verbose SDK logs" setting at launch
     }
 
     var isReady: Bool { if case .ready = sdkState { return true } else { return false } }
@@ -193,20 +183,17 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
                 // NOTE: the committed sample is prod-only. A dev sandbox token + the
                 // DEBUG proof-export are your LOCAL overlay (see the #54 recovery note);
                 // they are intentionally NOT wired here so the public sample stays clean.
+                let logLevel = Channel.logLevel()
+                let creditServiceUrl = Channel.creditServiceUrl(activationServerUrl: LocalConfig.activationServerUrl)
                 let config = OctetConfig(
                     licenseKey: LocalConfig.licenseKey,
                     proofUploadUrl: settings.uploadsEnabled ? LocalConfig.activationServerUrl : nil,
+                    creditServiceUrl: creditServiceUrl,
                     advanced: AdvancedConfig(
                         activationServerUrl: LocalConfig.activationServerUrl,
-                        logLevel: settings.verboseLogs ? .verbose : .info))
+                        logLevel: logLevel))
                 let started = try await Octet.start(config: config, startPosition: nil)
                 self.sdk = started
-                #if DEBUG
-                // octet-verify-private#54: emit the semantic-binding-v2 stage so the
-                // verifier can be exercised against a real device proof. DEBUG-only —
-                // compiled out of release; toggled from the hidden dev menu.
-                if settings.semanticV2 { OctetSemanticV2Debug.setEnabled(true) }
-                #endif
                 complete("init", since: t0)
                 self.sdkState = .ready
                 log("sdk.start ok")
@@ -214,7 +201,7 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
                 if let s = started.licenseStatus {
                     licenseLine = "license \(s.state.rawValue)"
                     if s.state == .gracePeriod, let days = s.daysUntilHardStop {
-                        licenseNotice = "Your license expires in \(days) day\(days == 1 ? "" : "s") — please renew."
+                        licenseNotice = "The Octet license ends in \(days) day\(days == 1 ? "" : "s"). Licenses renew automatically. If it has not renewed, contact Octet."
                     }
                 }
             } catch {
@@ -419,32 +406,6 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     func clearDebug() { debug.removeAll() }
 
-    // MARK: - verbose SDK log stream (PublicLog surface; debug-only)
-
-    /// Install or remove the sample's `PublicLog` sink to match the "Verbose SDK
-    /// logs" toggle. Live — no restart needed to start/stop capturing. `PublicLog`
-    /// carries only the SDK's public lifecycle / verdict / error events, so this
-    /// never surfaces internal signals, scores, coordinates, keys, or identifiers.
-    func applyVerboseLogging() {
-        if settings.verboseLogs {
-            if !sdkLogInstalled { PublicLog.shared.addSink(sdkLogSink); sdkLogInstalled = true }
-        } else {
-            if sdkLogInstalled { PublicLog.shared.removeSink(sdkLogSink); sdkLogInstalled = false }
-            sdkLog.removeAll()
-        }
-    }
-
-    /// Called from the (possibly background) `LogSink` — hop to the main actor to
-    /// mutate the published buffer. Capped so a long session can't grow unbounded.
-    nonisolated func appendSDKLog(_ text: String) {
-        Task { @MainActor in
-            self.sdkLog.append(DebugLine(time: Date(), text: text))
-            if self.sdkLog.count > 300 { self.sdkLog.removeFirst(self.sdkLog.count - 300) }
-        }
-    }
-
-    func clearSDKLog() { sdkLog.removeAll() }
-
     // MARK: - labels (public, non-sensitive)
 
     func bucketLabel(_ score: Double) -> String {
@@ -471,27 +432,5 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
         case .city: return "CITY"
         default: return "—"
         }
-    }
-}
-
-/// A `LogSink` that forwards the SDK's public log lines to a callback (→ the
-/// in-app SDK-log view). Only `PublicLog` events reach here — the SDK keeps its
-/// internal signals / scores on `InternalLog`, which is never exposed.
-final class SampleLogSink: LogSink, @unchecked Sendable {
-    private let onLine: (String) -> Void
-    init(onLine: @escaping (String) -> Void) { self.onLine = onLine }
-
-    func log(level: LogLevel, tag: String, message: String, error: Error?) {
-        let mark: String
-        switch level {
-        case .verbose: mark = "V"
-        case .debug: mark = "D"
-        case .info: mark = "I"
-        case .warn: mark = "W"
-        case .error: mark = "E"
-        }
-        var line = "[\(mark)] \(tag): \(message)"
-        if let error { line += " — \(error)" }
-        onLine(line)
     }
 }
