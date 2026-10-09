@@ -43,7 +43,6 @@ struct DevSettingsView: View {
 
                 #if DEBUG
                 Section {
-                    Toggle("Semantic-binding v2", isOn: $settings.semanticV2)
                     Toggle("Verbose SDK logs", isOn: $settings.verboseLogs)
                     if settings.verboseLogs {
                         NavigationLink { SDKLogView() } label: {

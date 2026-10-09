@@ -10,8 +10,11 @@ import SwiftUI
 struct SensorsView: View {
     @StateObject private var m = SensorMonitor()
 
+    @State private var theater: Theater?
+
     var body: some View {
         List {
+            labSection
             locationSection
             motionSection
             cellularSection
@@ -22,6 +25,44 @@ struct SensorsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { m.start() }
         .onDisappear { m.stop() }
+        .fullScreenCover(item: $theater) { TheaterView(theater: $0) }
+    }
+
+    // MARK: - GNSS & Radio Lab
+
+    private var labSection: some View {
+        Section {
+            NavigationLink { GnssSkyView() } label: {
+                labRow("GNSS · Sky", "Live sky map + satellite table & detail", "dot.radiowaves.up.forward", chevron: false)
+            }
+            Button { theater = .orbit } label: {
+                labRow("GNSS · Orbits (3D)", "How a satellite fix is made — step by step", "globe")
+            }
+            Button { theater = .cell } label: {
+                labRow("Cell · Triangulation", "Tower triangulation on a live map (simulated on iOS)", "antenna.radiowaves.left.and.right")
+            }
+            Button { theater = .location } label: {
+                labRow("octet-location", "The full fix — satellites + cell towers, combined", "scope")
+            }
+        } header: {
+            Label("GNSS & Radio Lab", systemImage: "sparkles")
+        } footer: {
+            Text("Interactive visualizations of how a location fix is made. iOS withholds per-satellite and cell-identity data, so those signals are simulated and badged — the fix itself is real.")
+        }
+    }
+
+    private func labRow(_ title: String, _ subtitle: String, _ icon: String, chevron: Bool = true) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).foregroundStyle(.primary)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            if chevron {
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+            }
+        }
     }
 
     // MARK: - Location & GNSS quality

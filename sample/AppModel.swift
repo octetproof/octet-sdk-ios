@@ -193,20 +193,21 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
                 // NOTE: the committed sample is prod-only. A dev sandbox token + the
                 // DEBUG proof-export are your LOCAL overlay (see the #54 recovery note);
                 // they are intentionally NOT wired here so the public sample stays clean.
+                // `verboseLogs` is a DEBUG-only dev-menu setting (compiled out of
+                // release builds); in release it doesn't exist, so default to `.info`.
+                #if DEBUG
+                let logLevel: LogLevel = settings.verboseLogs ? .verbose : .info
+                #else
+                let logLevel: LogLevel = .info
+                #endif
                 let config = OctetConfig(
                     licenseKey: LocalConfig.licenseKey,
                     proofUploadUrl: settings.uploadsEnabled ? LocalConfig.activationServerUrl : nil,
                     advanced: AdvancedConfig(
                         activationServerUrl: LocalConfig.activationServerUrl,
-                        logLevel: settings.verboseLogs ? .verbose : .info))
+                        logLevel: logLevel))
                 let started = try await Octet.start(config: config, startPosition: nil)
                 self.sdk = started
-                #if DEBUG
-                // octet-verify-private#54: emit the semantic-binding-v2 stage so the
-                // verifier can be exercised against a real device proof. DEBUG-only —
-                // compiled out of release; toggled from the hidden dev menu.
-                if settings.semanticV2 { OctetSemanticV2Debug.setEnabled(true) }
-                #endif
                 complete("init", since: t0)
                 self.sdkState = .ready
                 log("sdk.start ok")
@@ -426,12 +427,18 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
     /// carries only the SDK's public lifecycle / verdict / error events, so this
     /// never surfaces internal signals, scores, coordinates, keys, or identifiers.
     func applyVerboseLogging() {
+        // `verboseLogs` is a DEBUG-only `AppSettings` member (compiled out of
+        // release builds), so this is a no-op in release — the verbose `PublicLog`
+        // sink is a hidden-dev-menu affordance. Without this guard the sample fails
+        // to compile in Release (`AppSettings` has no member 'verboseLogs').
+        #if DEBUG
         if settings.verboseLogs {
             if !sdkLogInstalled { PublicLog.shared.addSink(sdkLogSink); sdkLogInstalled = true }
         } else {
             if sdkLogInstalled { PublicLog.shared.removeSink(sdkLogSink); sdkLogInstalled = false }
             sdkLog.removeAll()
         }
+        #endif
     }
 
     /// Called from the (possibly background) `LogSink` — hop to the main actor to
