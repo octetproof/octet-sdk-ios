@@ -5,6 +5,107 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.1.0] — 2026-11-09
+
+> Minor release, in lockstep with Android 3.1.0.
+
+### Added
+- **Offline `Octet.verify` can check your session nonce.** Pass the `sessionNonce` you
+  asked for the proof with as `VerifyOptions.expectedSessionNonce` (`Data?`). The new
+  `session-binding` check fails a proof made for a different nonce, or for none, so a
+  proof captured from another session can't be replayed to you. Without the option the
+  check reports not checked and verification is unchanged. Making sure each nonce is
+  used only once is still up to you.
+- **License lines you can act on, in the device log.** Every `Octet.start` logs
+  which license mode it took (category `OctetLicense`): sandbox when
+  `sandboxBypassToken` is set, production otherwise. It warns when the SDK
+  version is deprecated or the license stops working within 30 days, and when
+  `Octet.start` throws a `LicenseError` it logs the case and what to fix. No line
+  carries coordinates, device identifiers or your sandbox token. See "Log output"
+  in INTEGRATION.md.
+- **Content commitments.** `content` on `isWithin`, `isOutside` and `contains` signs a
+  commitment to your content into the proof. The content stays on the device unless you ask
+  the SDK to upload it. Caller content is off until Octet enables it for your licence.
+  Until then, a query with `content` returns `indeterminate` with reason
+  `callerContentNotEnabled`. See "Content commitments" in INTEGRATION.md.
+- **`Octet.hashContent`** hashes a file of any size before the proof call.
+- **`VerifyOptions.callerMetadata`** and **`requireCallerMetadata`** check a commitment on the
+  device.
+- **Uploads of committed content to your storage.** Set `upload: true` on a `ContentItem` (or
+  `uploadFrom` on a `digest` item) and register `Octet.setContentUploadProvider`, which returns
+  an upload target from your backend for each attempt, such as a pre-signed URL. Octet stores
+  none of the bytes. `Octet.setContentUploadListener` and `Octet.contentUploads(proofId:)`
+  report each item's state. Forward background URL session events to
+  `Octet.handleBackgroundUploadEvents`. See "Uploading content to your storage" in
+  INTEGRATION.md.
+
+### Changed
+- **Proofs use semantic binding v3.** Each proof also signs the region it was asked about,
+  so your verifier can read the device's signed inside or outside answer for that region. If
+  your backend verifies proofs with `octet-verify`, upgrade it to 1.5.0 or later before you
+  ship this version. Older verifiers fail every proof it makes. `Octet.verify` on the device
+  already handles it.
+- **A licence that is withdrawn or expires stops the running session.** Predicates then
+  return `indeterminate` with reason `licenseInactive` and make no proof, and
+  `licenseStatus.state` reads `.revoked` or `.expired`. The next `Octet.start` throws a
+  `LicenseError`. Handle the new cases `LicenseState.revoked` and `licenseInactive` in any `switch`
+  over these types.
+- **`BootstrapReason.appPendingContested`**: a typed startup failure when another licence
+  claims the same app and your pending registration lost that claim. Register the app again,
+  or contact Octet support.
+- **Positions at sea next to Crimea, Sevastopol and the other occupied Ukrainian regions
+  resolve to Ukraine.** Within 22 km of their coast, the country is `UA` and the region is that
+  Ukrainian region, never Russia.
+- **No confidence score or assurance tier by default.** Verdicts and proofs now report
+  neutral confidence values (`0`, empty), `spoofingVerdict` is `UNSPECIFIED`, and
+  `toStr()` prints no `conf=`. `Octet.verify` reports no tier and ignores `requireVerdict`
+  (its check reports "not checked"). The answer (`result`, `level`, `reason`) is unchanged.
+- **`CheckStatus` has a new case, `inconclusive`.** A `switch` over `CheckStatus` without a
+  default branch no longer compiles. Add the case or a default branch.
+- **`isAuthentic` is false when a check is `INCONCLUSIVE`.** Only the content check can be
+  inconclusive, so nothing changes unless you pass `callerMetadata`.
+
+### Deprecated
+- **`Octet.creditStatus()` and `CreditStatus`.** It always reports `overQuota` as false. To
+  learn that your account accepts no new devices, handle
+  `LicenseError.bootstrapFailed(reason: .newDevicesBlocked(upgradeUrl:))` from `Octet.start`.
+  Both will be removed in the next major release.
+- **The confidence score fields and `VerifyOptions.requireVerdict`.** `overallScore`,
+  `spoofingRiskScore`, `sensorContributions` and `flags` on `ConfidenceSummary`, and
+  `requireVerdict`, are deprecated and will be removed in the next major release.
+- **`OctetConfig.licenseKey`.** `Octet.start` doesn't use it, so leave it out:
+  `OctetConfig()` needs no arguments. Code that still passes `licenseKey:` builds
+  with a deprecation warning. The field will be removed in the next major version.
+
+### Fixed
+- **The first proof after `Octet.start` waits for the SDK instead of failing.** A fresh proof
+  asked for right after start used to return `noFix` straight away while positioning warmed
+  up. It now waits up to 30 seconds for a usable fix, so allow for this if your app
+  times out its first call.
+- **Country proofs work with Precise Location off.** When a user turns Precise Location
+  off, iOS reports locations a few kilometres wide, and the SDK used to return
+  `noFix` for every proof. Country proofs now work wherever the whole accuracy area is
+  inside the country; finer levels return `insufficientPrecision` with the best
+  achievable level.
+- **Proofs you ask for after a pause are uploaded again.** An upload challenge is
+  valid for about 5 minutes, and the SDK keeps one ready in advance. An app that asked
+  for proofs less often than that found the prepared challenge expired, so those proofs
+  weren't uploaded. A proof you ask for now fetches a fresh challenge first when needed
+  (waiting at most 3 seconds). Background proofs are unchanged.
+- **Proof uploads ride out a busy or unavailable server.** When your proof upload
+  endpoint answers `503` or `429`, the SDK now waits as the `Retry-After` header asks
+  (at most 60 seconds per wait) and keeps retrying until shortly before the upload
+  challenge expires (about 5 minutes), instead of dropping the proof after three quick
+  retries. Other errors are handled as before.
+- **`OctetConfig.advanced.logLevel` now takes effect.** It was never applied, so
+  the SDK's public log ran at its default level whatever you set. Sinks you add
+  with `PublicLog.shared.addSink(_:)` keep receiving lines.
+- **`Octet.start` throws a `LicenseError` on a device without App Attest.** It
+  threw the system error instead, so `catch let e as LicenseError` missed it. It
+  is now `.bootstrapFailed(reason: .attestationInvalid)`.
+- **The privacy manifest declares coarse location for Analytics as well as App
+  Functionality.** Update your App Store privacy details to match.
+
 ## [3.0.0] — 2026-10-09
 
 > Major release, in lockstep with Android 3.0.0. Read _Changed (breaking)_ before upgrading.

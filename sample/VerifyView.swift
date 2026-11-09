@@ -96,7 +96,7 @@ struct ProofRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(proof.regionLabel).font(.subheadline.weight(.medium))
                 HStack(spacing: 6) {
-                    Chip(text: proof.bucket.rawValue, tint: proof.bucket.tintKind.color)
+                    if let bucket = proof.bucket { Chip(text: bucket.rawValue, tint: bucket.tintKind.color) }
                     if proof.imported { Chip(text: "imported", tint: Theme.accent) }
                     Text(Self.short(proof.createdAt)).font(.caption).foregroundStyle(.secondary)
                 }

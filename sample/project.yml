@@ -40,7 +40,7 @@ targets:
           LSHandlerRank: Owner
           LSItemContentTypes:
           - com.octetproof.proof
-        CFBundleIconName: AppIcon
+        CFBundleIconName: $(ASSETCATALOG_COMPILER_APPICON_NAME)
         ITSAppUsesNonExemptEncryption: false
         LSSupportsOpeningDocumentsInPlace: true
         NSLocationWhenInUseUsageDescription: This sample uses your location to demonstrate

@@ -15,13 +15,15 @@ struct StoredProof: Codable, Identifiable, Hashable {
     let level: String              // proof level, e.g. "ON_EARTH" / "COUNTRY"
     let generatedAtMs: Int64       // the proof's own signed timestamp
     let createdAt: Date            // when this device stored it
-    let confidenceScore: Double    // ConfidenceSummary.overallScore
+    let confidenceScore: Double?   // ConfidenceSummary.overallScore; nil when the licence hides the score
     let predicateResult: String?   // "inside" / "outside" / "indeterminate"; nil if imported
     let imported: Bool             // arrived via share/AirDrop rather than generated here
     let sizeBytes: Int
 
     var proofBytes: Data { Data(base64Encoded: proofB64) ?? Data() }
-    var bucket: ConfidenceBucket { ConfidenceBucket(score: confidenceScore) }
+    /// nil = nothing to grade: an imported proof, or a licence that hides the score.
+    /// Older records stored 0 for an imported proof, so `imported` is checked too.
+    var bucket: ConfidenceBucket? { imported ? nil : ConfidenceBucket(score: confidenceScore) }
 
     /// Stable content key for de-duplication (same proof bytes = same proof).
     var contentKey: String { proofB64 }
@@ -29,10 +31,15 @@ struct StoredProof: Codable, Identifiable, Hashable {
 
 /// Confidence tier — the sample buckets `overallScore` so the UI can read at a
 /// glance without exposing internal sub-scores.
+///
+/// A licence that doesn't expose the score gets `overallScore = 0`. That is
+/// "not reported", not "weak", so there is no bucket at all (nil) rather than a red LOW.
 enum ConfidenceBucket: String {
     case high = "HIGH", medium = "MEDIUM", low = "LOW"
 
-    init(score: Double) {
+    /// nil when there is no score to grade.
+    init?(score: Double?) {
+        guard let score else { return nil }
         switch score {
         case 0.8...: self = .high
         case 0.5..<0.8: self = .medium

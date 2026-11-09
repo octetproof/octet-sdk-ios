@@ -8,6 +8,8 @@ struct OctetSampleApp: App {
     // The model owns the store + settings; all three are injected so views can
     // observe whichever they need (list updates on the store, tabs on settings).
     @StateObject private var model = AppModel(store: ProofStore(), settings: AppSettings())
+    // Launch-time hooks of the channel (ChannelHooks.swift: none in this app).
+    @UIApplicationDelegateAdaptor(ChannelAppDelegate.self) private var channelDelegate
 
     var body: some Scene {
         WindowGroup {

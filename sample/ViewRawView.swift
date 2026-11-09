@@ -13,7 +13,9 @@ struct ViewRawView: View {
                 row("region", proof.regionLabel + (proof.regionISO.map { " (\($0))" } ?? ""))
                 row("proof level", proof.level)
                 row("generated", Self.stamp(proof.generatedAtMs))
-                row("confidence", String(format: "%.2f (%@)", proof.confidenceScore, proof.bucket.rawValue))
+                if let score = proof.confidenceScore, let bucket = proof.bucket {
+                    row("confidence", String(format: "%.2f (%@)", score, bucket.rawValue))
+                }
                 if let r = proof.predicateResult { row("predicate", r) }
                 row("source", proof.imported ? "imported" : "generated on this device")
                 row("size", "\(proof.sizeBytes) bytes")

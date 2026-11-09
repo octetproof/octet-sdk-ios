@@ -9,11 +9,17 @@ enum Channel {
     static func glossaryText(for key: String) -> String? { nil }
 }
 
+final class ChannelAppDelegate: NSObject, UIApplicationDelegate {}
+
 struct ChannelTabs: View {
     var body: some View { EmptyView() }
 }
 
 struct ChannelHeaderAccessory: View {
+    var body: some View { EmptyView() }
+}
+
+struct ChannelGenerateBanner: View {
     var body: some View { EmptyView() }
 }
 

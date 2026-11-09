@@ -11,6 +11,7 @@ struct GenerateView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.l) {
                 header
+                ChannelGenerateBanner()
                 PipelineCard(steps: model.steps, state: model.sdkState)
                 if let notice = model.licenseNotice {
                     Text(notice).font(.footnote)
@@ -162,8 +163,10 @@ struct ResultCard: View {
                     Text(headline).font(.headline)
                 }
                 HStack(spacing: Theme.Space.s) {
-                    Chip(text: result.bucket.rawValue, tint: result.bucket.tintKind.color)
-                    Text(String(format: "%.2f", result.score)).font(Theme.mono(12)).foregroundStyle(.secondary)
+                    if let bucket = result.bucket, let score = result.score {
+                        Chip(text: bucket.rawValue, tint: bucket.tintKind.color)
+                        Text(String(format: "%.2f", score)).font(Theme.mono(12)).foregroundStyle(.secondary)
+                    }
                     if result.stored != nil {
                         if result.fresh { Chip(text: "✓ fresh", tint: Theme.pass) }
                         else { Chip(text: "cached") }

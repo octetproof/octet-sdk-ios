@@ -15,8 +15,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "OctetSDK",
-            url: "https://github.com/octetproof/octet-sdk-ios/releases/download/3.0.0/OctetSDK.xcframework.zip",
-            checksum: "245b0631e7313cc86ee565e9529e37996e6667278c6ac8e10461c4360efdef8d"
+            url: "https://github.com/octetproof/octet-sdk-ios/releases/download/3.1.0/OctetSDK.xcframework.zip",
+            checksum: "4827dbbb1ab54583e4b35a95fe45caa0dcf6a4ee10f6bc6a0267d7794ae5917f"
         ),
     ]
 )

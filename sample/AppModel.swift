@@ -38,8 +38,8 @@ struct DebugLine: Identifiable {
 struct GenerateResult {
     let result: OctetVerdict.Result
     let regionLabel: String
-    let bucket: ConfidenceBucket
-    let score: Double
+    let score: Double?               // nil when the licence hides the score
+    var bucket: ConfidenceBucket? { ConfidenceBucket(score: score) }
     let fresh: Bool
     let stored: StoredProof?
     var battery: BatteryCost?
@@ -95,7 +95,7 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
     let store: ProofStore
     let settings: AppSettings
 
-    private var sdk: OctetSdk?
+    private(set) var sdk: OctetSdk?
     private let locationManager = CLLocationManager()
     private var startTask: Task<Void, Never>?
 
@@ -200,7 +200,7 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
                 log("activation ✓")
                 if let s = started.licenseStatus {
                     licenseLine = "license \(s.state.rawValue)"
-                    if s.state == .gracePeriod, let days = s.daysUntilHardStop {
+                    if s.state == .renewalRecommended, let days = s.daysUntilHardStop {
                         licenseNotice = "The Octet license ends in \(days) day\(days == 1 ? "" : "s"). Licenses renew automatically. If it has not renewed, contact Octet."
                     }
                 }
@@ -239,11 +239,12 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
         // forceFresh always mints a new proof, so a produced proof is fresh;
         // otherwise trust the SDK's honest "freshly generated" message.
         let fresh = forceFresh || verdict.message.localizedCaseInsensitiveContains("fresh")
-        log("fix quality: \(bucketLabel(verdict.confidence.overallScore))")
+        let score = Self.reportedScore(verdict)
+        if let bucket = ConfidenceBucket(score: score) { log("fix quality: \(bucketLabel(bucket))") }
 
         var stored: StoredProof?
         if let proof = verdict.proof {
-            let sp = makeStoredProof(from: proof, result: verdict.result)
+            let sp = makeStoredProof(from: proof, result: verdict.result, score: score)
             let isNew = store.add(sp)
             stored = sp
             log(isNew ? "proof built (\(proof.proofBytes.count) B) · stored" : "proof already stored")
@@ -255,8 +256,7 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
         lastResult = GenerateResult(
             result: verdict.result,
             regionLabel: selectedCountry.name,
-            bucket: ConfidenceBucket(score: verdict.confidence.overallScore),
-            score: verdict.confidence.overallScore,
+            score: score,
             fresh: fresh,
             stored: stored,
             battery: battery)
@@ -285,7 +285,19 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
         return BatteryCost(pct: pct, charging: charging, durationSec: duration)
     }
 
-    private func makeStoredProof(from proof: LocationProof, result: OctetVerdict.Result) -> StoredProof {
+    /// A licence that doesn't expose the score gets a ConfidenceSummary
+    /// of neutral values only (0, empty). That means "not reported", not "weak", so the
+    /// sample shows no score or bucket rather than a red LOW 0.00. Read from the summary,
+    /// not `LocationProof.spoofingVerdict`: the public build pins a published SDK that
+    /// predates that field. LOCKSTEP with Android `reportedScore`.
+    static func reportedScore(_ verdict: OctetVerdict) -> Double? {
+        let c = verdict.confidence
+        let hidden = c.overallScore == 0 && c.spoofingRiskScore == 0
+            && c.sensorContributions.isEmpty && c.flags.isEmpty
+        return hidden ? nil : c.overallScore
+    }
+
+    private func makeStoredProof(from proof: LocationProof, result: OctetVerdict.Result, score: Double?) -> StoredProof {
         StoredProof(
             id: UUID().uuidString,
             proofB64: proof.proofBytes.base64EncodedString(),
@@ -294,7 +306,7 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
             level: levelLabel(proof.level),
             generatedAtMs: proof.timestampMs,
             createdAt: Date(),
-            confidenceScore: proof.confidence.overallScore,
+            confidenceScore: score,
             predicateResult: resultLabel(result),
             imported: false,
             sizeBytes: proof.proofBytes.count)
@@ -331,7 +343,7 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
             level: "—",
             generatedAtMs: env.generatedAtMs,
             createdAt: Date(),
-            confidenceScore: 0,
+            confidenceScore: nil,
             predicateResult: nil,
             imported: true,
             sizeBytes: bytes.count)
@@ -408,8 +420,8 @@ final class AppModel: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     // MARK: - labels (public, non-sensitive)
 
-    func bucketLabel(_ score: Double) -> String {
-        switch ConfidenceBucket(score: score) {
+    func bucketLabel(_ bucket: ConfidenceBucket) -> String {
+        switch bucket {
         case .high: return "strong"
         case .medium: return "ok"
         case .low: return "weak"
