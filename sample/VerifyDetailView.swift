@@ -44,6 +44,7 @@ struct VerifyDetailView: View {
                 }
                 group("PASSED", v.checks.filter { $0.status == .pass }, .ok)
                 group("WARN", v.checks.filter { $0.status == .warn }, .warn)
+                group("INCONCLUSIVE", v.checks.filter { $0.status == .inconclusive }, .warn)
                 group("NOT-CHECKED", v.checks.filter { $0.status == .notChecked }, .notChecked)
                 group("FAILED", v.checks.filter { $0.status == .fail }, .bad)
 

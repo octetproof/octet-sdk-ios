@@ -5,6 +5,14 @@ All notable changes to the OctetSDK for iOS are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [3.1.1] — 2026-11-10
+
+> Patch release, in lockstep with Android 3.1.1.
+
+### Changed
+- **Framework packaging.** Internal packaging changes to the iOS framework. No change to the
+  public API, to proofs, or to how you integrate.
+
 ## [3.1.0] — 2026-11-09
 
 > Minor release, in lockstep with Android 3.1.0.
